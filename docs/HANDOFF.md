@@ -41,7 +41,7 @@ Verifikasi build produksi + seluruh pemeriksaan kualitas kode:
 ```bash
 npm run build        # harus lolos; hasil di dist/ (abaikan, sudah .gitignore)
 npm run lint         # exit 0 (11 warning modul 00 memang sah, lihat §3.4)
-npm run test         # 90 uji di 7 berkas, lihat §3.6
+npm run test         # 91 uji di 7 berkas, lihat §3.6
 npm run format:check # gaya kode infra (materi ajar sengaja dikecualikan)
 ```
 
@@ -119,7 +119,7 @@ perintah ini ada.
 | `src/pages/NextStepsPage.jsx` | Render isi `11-next-steps.md` dengan react-markdown; heading markdown **diturunkan satu tingkat** supaya halaman tidak berakhir punya dua `<h1>` |
 | `src/test/setup.js` | Matcher jest-dom + `cleanup()` + `localStorage.clear()` tiap uji, hanya bila DOM tersedia |
 | `src/README.md` | Peta file hub untuk pengembang/pengajar (H10) |
-| `tests/*.test.{js,jsx}` | 7 berkas, 90 uji — rinciannya di §3.6 |
+| `tests/*.test.{js,jsx}` | 7 berkas, 91 uji — rinciannya di §3.6 |
 
 **Aturan penamaan CSS:** semua kelas hub wajib berawalan `hub-` agar tidak menabrak kelas milik modul (`.tombol`, `.keranjang`, dsb). Pengecualian yang disengaja: penimpa `#root` di `src/hub.css` (selektor elemen, bukan kelas) dan gaya element-selector di `styles/base.css` yang memang dipakai bersama.
 
@@ -217,8 +217,33 @@ skipped)`. Angka skip-nya tetap yang lama (mekanika klon + uji "repo sebenarnya"
 yang berarti sembilan uji stamen baru memang dijalankan di ext4 — bukan di-*skip*
 oleh lingkungan. Cara mereproduksi kondisi itu di mesin APFS: bikin `cp` palsu yang
 hanya menolak `-c`, taruh di depan `PATH`, lalu `npx vitest run
-tests/dedup-modules.test.js` → `24 passed | 4 skipped (28)` (4, bukan 5, karena
-blok "repo sebenarnya" ikut jalan di mesin yang modulnya ter-install).
+tests/dedup-modules.test.js` → dulu `24 passed | 4 skipped (28)` (4, bukan 5, karena
+blok "repo sebenarnya" ikut jalan di mesin yang modulnya ter-install). Angka itu
+sendiri sudah tua: sesudah perbaikan merah yang ketiga (lihat di bawah) dan uji
+`cp` palsunya, reproduksi yang sama memberi `34 passed | 4 skipped (38)`, dan
+keempat yang di-*skip* semuanya berlabel `jalur clone sungguhan` — tidak satu pun
+penjaga keputusan, termasuk sepuluh keputusan `--akar`, ikut ter-*skip*.
+
+Merah yang ketiga mengulang penyakit yang sama dari arah yang lebih halus —
+`e4ce457` + lintasan `--akar`, run `39795900782`: **dua kaki `hub` gagal**, gejalanya
+`AssertionError: expected '…' to match /0 paket sekarang berbagi blok/` dengan
+`+ Received` yang berisi `AKAR dilewati — tanpa reflink…`. Suite lokal hijau penuh
+(karena APFS), dan kali ini bukan `cp -c` yang hilang — skripnya memang **memilih**
+menolak lintasan root di volume tanpa reflink. Itu kesalahan desain, bukan lingkungan:
+`--copy` ada justru supaya keputusan teruji di mana pun (§4), dan blok uji ini
+membawa `--copy` lewat `jalankan()`. Sembilan uji blok itu karenanya cuma hijau
+di APFS. Perbaikannya dua bagian (lintasan root tetap
+jalan dengan mekanika salinan + kata ringkasan yang jujur per mekanika) dan
+kontrol negatif yang membuktikan penjaga barunya bisa gagal tercatat di §4. Run
+perbaikannya menyusul, dan nomornya dicatat di §6.
+
+> Cara membaca hasil run ini juga mengecoh dan perlu dicatat: `gh run view
+> --json status,conclusion` melaporkan `completed`/`failure` sementara 12 dari 13
+> job masih berstatus `queued`/`in_progress` (yang selesai baru `Build 02-styling`).
+> Jangan simpulkan "runner rusak" dari sana — ambil `--log-failed`; di situlah
+> `##[error]AssertionError …` muncul dengan `+ Received` lengkap. `annotations`
+> juga mengembalikan 404 untuk run ini, jadi itu bukan jalan masuk yang bisa
+> diandalkan.
 
 Perubahan yang lahir dari menemukan warning CI, bukan dari niat awal:
 
@@ -266,7 +291,7 @@ JSX di berkas uji bisa dijalankan tanpa satu pun pengaturan tambahan.
 | `tests/module-registry.test.js` | 5 | `src/modules.js`: 12 entri, nomor unik 00-11, hanya entri `react` yang punya komponen malas |
 | `tests/struktur-modul.test.js` | 8 | Hubungan registry ↔ disk, rantai `@import` base.css, hub `#root` override, halaman 11 harus tetap malas |
 | `tests/hygiene.test.js` | 18 | Yang tidak bisa dijaga lint/build: Prettier tidak menyentuh materi ajar, inti pelajaran Modul 00 masih utuh, tidak ada huruf CJK terselip |
-| `tests/dedup-modules.test.js` | 37 | Perilaku `scripts/dedup-modules.sh` (perkakas hemat disk, §4): folder mana yang boleh disentuh, penjaga lockfile, `--dry-run`, `--force`, `--copy`, penolakan di volume tanpa reflink, **stamen** (`SIAP`/`BEDA`/`LEWAT`: pohon sudah diisi, berubah sendiri, atau donornya yang berubah), dan **lintasan root `--akar`** (9 uji: opt-in saja, paket identik termasuk yang `@scope/…` ditukar, `.bin`/`.vite` tak pernah disentuh, `BEDA` menahan tambalan lokal, `--force` boleh menimpa, dan run kedua tidak mengerjakan apa pun). Berlingkungan `node` — membaca/menulis disk, tidak pakai DOM |
+| `tests/dedup-modules.test.js` | 38 | Perilaku `scripts/dedup-modules.sh` (perkakas hemat disk, §4): folder mana yang boleh disentuh, penjaga lockfile, `--dry-run`, `--force`, `--copy`, penolakan di volume tanpa reflink, **stamen** (`SIAP`/`BEDA`/`LEWAT`: pohon sudah diisi, berubah sendiri, atau donornya yang berubah), dan **lintasan root `--akar`** (10 uji: opt-in saja, paket identik termasuk yang `@scope/…` ditukar, `.bin`/`.vite` tak pernah disentuh, `BEDA` menahan tambalan lokal, `--force` boleh menimpa, run kedua tidak mengerjakan apa pun, dan **keputusan root tetap ditegakkan di volume tanpa reflink tanpa mengklaim hemat blok** — pakai `cp` palsu, jadi jalur ini teruji bahkan di mesin APFS). Berlingkungan `node` — membaca/menulis disk, tidak pakai DOM |
 
 Enam kebiasaan yang membuat uji ini bernilai, dan yang harus dipertahankan
 kalau ada yang menambah berkas uji baru:
@@ -285,12 +310,16 @@ kalau ada yang menambah berkas uji baru:
   dijaga keputusan, bukan tampilan: penjaga lockfile saya matikan → uji
   "melewati folder yang lockfile-nya tidak setara" MERAH; bug urutan
   (`kunci_of` dipakai sebelum daftarnya dihitung) saya kembalikan → uji
-  `Donor: … (lockfile …)` MERAH. Dua mutasi juga dijalankan untuk blok `--akar`
+  `Donor: … (lockfile …)` MERAH. Tiga mutasi juga dijalankan untuk blok `--akar`
   sebelum blok itu dianggap selesai: baris `if (e.name === ".dedup-shared")
   continue;` di dalam penghitung sidik saya hapus → **2 uji MERAH** dengan gejala
   yang persis seperti bug aslinya (`3 BEDA tidak disentuh`, paket yang sudah
-  berbagi dilaporkan berbeda); dan penjaga `[ "$force" -eq 1 ]` pada cabang `BEDA`
-  saya longgarkan → uji "tambalan bertahan" MERAH. Keduanya dikembalikan.
+  berbagi dilaporkan berbeda); penjaga `[ "$force" -eq 1 ]` pada cabang `BEDA`
+  saya longgarkan → uji "tambalan bertahan" MERAH; dan cabang non-reflink saya
+  kembalikan ke perilaku "dilewati" → uji `1 paket sekarang disalin dari` MERAH
+  (ini yang membuktikan bahwa Merah CI di §3.5 bisa tertangkap di mesin sendiri
+  kalau ujinya ada). Ketiganya dikembalikan.
+- **Uji yang menembak perkakas filesystem tidak boleh bergantung pada reflink.** `jalankan()` selalu mengirim `--copy` supaya keputusan teruji di ext4 (CI) maupun APFS (mesin penulis), dan blok `describe.runIf(mendukungClone)` khusus untuk MEKANIKA klon saja. Dua merah pertama di §3.5 lahir dari pelanggaran aturan ini; yang ketiga juga, bentuknya lebih halus: lintasan `--akar` menolak bekerja tanpa reflink sementara ujiannya mengirim `--copy` — hijau di laptop, MERAH di CI. Kontrol negatifnya harus dijalankan lewat `cp` palsu, bukan cuma lewat `runIf` (lihat §4).
 - **Uji perilaku bisa menemukan bug di perkakas yang diujinya.** Itu terjadi
   nyata di `tests/dedup-modules.test.js`. Fixture-nya menulis lockfile satu
   baris (minified), sementara skrip menormalisasi dengan `grep -v '"name"'` —
@@ -500,7 +529,7 @@ sidik 6cc0c292 vs 8b31d52a)` dengan **delapan lainnya tetap `SIAP`** dan berkas
 sisipan itu **tidak terhapus**.
 
 Empat penjaga yang membuatnya layak dipakai (semuanya dijaga uji perilaku di
-`tests/dedup-modules.test.js` — 37 uji, lihat §3.6 dan lintasan `--akar` di
+`tests/dedup-modules.test.js` — 38 uji, lihat §3.6 dan lintasan `--akar` di
 bawah):
 
 1. **Lockfile harus setara donor** — dinormalisasi lewat parser JSON (buang
@@ -584,6 +613,21 @@ berubah, jadi `--dry-run` setelah penulisan tetap melaporkan `64 sudah berbagi`
 dan `0 BEDA`. Yang dijaga metode ini adalah **pertukaran pohon yang salah**, bukan
 setiap bayangan perbedaan isi — persis seperti kompromi yang sudah diterima untuk
 stamen modul.
+
+**Lintasan ini TETAP jalan di volume tanpa reflink** (`--copy`), dan itu bukan
+kebakaran. Isi paket yang ditukar sudah terbukti identik, jadi salinan penuh tidak
+menambah apa pun yang sudah ada — hanya tidak menghemat. Versi pertama skrip
+menolaknya (`AKAR dilewati — tanpa reflink…`) dan akibatnya langsung tertangkap
+CI: run `39795900782` **MERAH** karena sembilan uji blok ini mengirim `--copy`
+(seperti yang selalu dilakukan `jalankan()`, lihat §3.6) sehingga di ext4 tidak ada
+pekerjaan yang berjalan sama sekali — suite hijau di APFS saja, persis kegagalan
+yang sudah dua kali terjadi di repo ini. Karena itu ringkasan `AKAR` memakai kata
+menurut mekanika: `berbagi blok dengan <donor>` saat clone, `disalin dari <donor>` +
+`TIDAK ada blok yang dihemat (mekanika salinan penuh)` saat `--copy` — skrip tidak
+pernah mengklaim hemat blok kalau tidak ada blok yang dibagi. Penjaganya: uji
+`di volume tanpa reflink keputusan root TETAP jalan…` memakai `cp` palsu sehingga
+jalur ini teruji lebih dulu di mesin APFS, tanpa harus menunggu CI; ia terbukti bisa
+gagal (dijalankan melawan kode lama → MERAH pada `1 paket sekarang disalin dari`).
 
 Yang tidak boleh disimpulkan dari angka itu: 49,4 MB adalah ukuran **logis** yang
 berhenti disimpan dua kali, sedangkan 32,9 MB adalah delta `df` yang terukur —
@@ -675,10 +719,10 @@ Diverifikasi pada kondisi saat ini (dev server + browser headless + uji otomatis
 | Modul baca-saja | `/modul/00`, `/modul/11` | ✅ 10 file ES6 + tab, halaman 11 terbaca sebagai HTML |
 | Runtime cleanliness | Console | ✅ **0 error / 0 warning** |
 | Latihan ES6 | `node` per file | ✅ 8 bab + `format.js`/`utils.js` jalan (CI menjalankan semuanya) |
-| Uji otomatis | `npm run test` | ✅ **90 uji pada 7 berkas**; penjaga uji pernah dibuktikan bisa gagal lewat mutasi (§3.6, termasuk dua mutasi untuk blok `--akar`). Angka **53** yang muncul di §3.5 adalah hasil run CI pada commit sebelum berkas uji dedup ada — bukan angka yang salah |
+| Uji otomatis | `npm run test` | ✅ **91 uji pada 7 berkas**; penjaga uji pernah dibuktikan bisa gagal lewat mutasi (§3.6, termasuk tiga mutasi untuk blok `--akar`). Angka **53** yang muncul di §3.5 adalah hasil run CI pada commit sebelum berkas uji dedup ada — bukan angka yang salah |
 | CI bentuk sekarang | `gh run view 39739605225 --json jobs` | ✅ **14 job: 13 lulus + `probe` ter-*skip*** — dua kaki `hub` (Node 22/24) dengan langkah uji, `isi-matriks` menghasilkan 10 folder dari disk, 10 job `Build <modul>` lulus dengan CSS 666-2173 byte |
 | Batas versi uji | job probe A/B (`node_version=20` vs `22`) | ✅ Node 20.20.2: `npm run test` **GAGAL** (26 uji node-only lulus, 4 berkas DOM mati); Node 22.23.3: **53 lulus**. Rinciannya di §3.5 |
-| Perkakas hemat disk (H3) | `npm run setup:shared -- --dry-run --force`, `npm run setup:shared -- --akar`, `df -k`, build & dev folder hasil klon | ✅ Rencana 9 folder terbaca benar; eksekusi `--force` → `Diisi: 9 \| Lewat: 0 \| Gagal: 0`, ruang tersedia volume naik **412.884 KB** (§4). `05-forms`/`10-final-project` tetap bisa `build` + dev dari pohon klon. Lintasan **`--akar`** terukur melepas **32.928 KB** lagi (64 paket root, 49.459.766 byte logis) dan run keduanya `0 paket \| 64 sudah berbagi \| 0 BEDA`. 37 uji perilaku menutup jalur non-reflink (direkam dengan `cp` palsu), tiga keputusan stamen (`SIAP`/`BEDA`/`LEWAT`, lihat §4), dan sembilan keputusan `--akar`. Yang sudah terbukti di CI (ext4, run `39767564475`): `76 passed \| 5 skipped (81)` per kaki hub, `dedup-modules.test.js (28 tests \| 5 skipped)` — yang di-skip cuma mekanika klon; keputusan tetap jalan di ext4 (rinciannya §3.5). Blok `--akar` yang sembilan uji terakhir itu belum punya nomor run CI sendiri: angkanya di baris ini berasal dari pengukuran lokal, dan akan dicatat menyusul begitu hijau (§3.5) |
+| Perkakas hemat disk (H3) | `npm run setup:shared -- --dry-run --force`, `npm run setup:shared -- --akar`, `df -k`, build & dev folder hasil klon | ✅ Rencana 9 folder terbaca benar; eksekusi `--force` → `Diisi: 9 \| Lewat: 0 \| Gagal: 0`, ruang tersedia volume naik **412.884 KB** (§4). `05-forms`/`10-final-project` tetap bisa `build` + dev dari pohon klon. Lintasan **`--akar`** terukur melepas **32.928 KB** lagi (64 paket root, 49.459.766 byte logis) dan run keduanya `0 paket \| 64 sudah berbagi \| 0 BEDA`. 38 uji perilaku menutup jalur non-reflink (direkam dengan `cp` palsu), tiga keputusan stamen (`SIAP`/`BEDA`/`LEWAT`, lihat §4), dan sepuluh keputusan `--akar`. Yang sudah terbukti di CI (ext4, run `39767564475`): `76 passed \| 5 skipped (81)` per kaki hub, `dedup-modules.test.js (28 tests \| 5 skipped)` — yang di-skip cuma mekanika klon; keputusan tetap jalan di ext4 (rinciannya §3.5). Blok `--akar` sendiri sudah punya riwayat CI dan tidak bersih: `e4ce457` memberi **merah yang ketiga** (run `39795900782`, dua kaki `hub`) karena lintasan root menolak jalan tanpa reflink sementara ujiannya selalu membawa `--copy` — hijau di APFS, MERAH di ext4 (gejala & perbaikannya di §3.5). Perbaikan yang membuatnya teruji di dua filesystem itu menambah uji ke-10 (`cp` palsu); nomor run hijau untuk perbaikan ini dicatat menyusul begitu push selesai. |
 | Situs live (Vercel) | `curl` anonim + browser nyata di `https://kursus-react.vercel.app` | ✅ `/`, `/modul/05`, `/modul/10`, `/modul/11` semuanya **200 tanpa login**; hash bundle produksi (`index-DMrxvv-X.js`) identik dengan build lokal; CSS 5.118 byte berisi `system-ui`; interaksi Todo terukur di produksi (**3 → 4** item, ringkasan "1 dari 4"); **0 error console, 0 request 4xx/5xx**; deep link tidak 404 karena rewrite `vercel.json` (§3.7) |
 
 Perintah re-verifikasi cepat untuk pengembang berikutnya:
@@ -709,7 +753,7 @@ keputusan model "modul mandiri".
 | H5 | 🟨 **Won't-fix (sadar)** | **Modul 00 tidak bisa dijalankan dari hub** (butuh Node) | Pembelajar harus buka terminal | Tidak dikerjakan; alasan & jalan keluar murah kalau terpaksa di §7.1 |
 | H6 | ✅ **Beres** | Dahulu: markdown 11 dirender mentah di `<pre>` | Sulit dibaca | Sekarang `react-markdown` + `remark-gfm` (hanya di hub), GFM aktif, gaya lewat blok `.hub-md`. Heading markdown **turun satu tingkat** karena verifikasi browser menemukan halaman punya dua `<h1>` (header hub + judul file). Dijaga `tests/next-steps.test.jsx` |
 | H7 | ✅ **Beres** | Dahulu: tombol "Salin" butuh secure context dan menelan kegagalan diam-diam | Gagal tanpa kabar lewat HTTP non-localhost | Sekarang `src/copyText.js`: clipboard modern → fallback `textarea` + `execCommand` → status **tiga keadaan** di tombol (`Salin` / `Tersalin!` / `Gagal menyalin`, dengan `aria-live`). Dijaga `tests/copyText.test.js` (5 uji, termasuk jalur tanpa clipboard) |
-| H8 | ✅ **Beres** | Dahulu: tidak ada ESLint/Prettier/CI/test | Regresi tak terdeteksi | **Sudah lengkap**: ESLint 10 flat config + cakupan `tests/**` (§3.4), Prettier 3, CI empat job dengan matriks Node + matriks folder modul (§3.5), dan 90 uji otomatis (§3.6) |
+| H8 | ✅ **Beres** | Dahulu: tidak ada ESLint/Prettier/CI/test | Regresi tak terdeteksi | **Sudah lengkap**: ESLint 10 flat config + cakupan `tests/**` (§3.4), Prettier 3, CI empat job dengan matriks Node + matriks folder modul (§3.5), dan 91 uji otomatis (§3.6) |
 | H9 | ✅ **Beres** | Dahulu: `docs/panduan.md` kosong 0 byte | Membingungkan | Sekarang **Panduan Pakai untuk Pembelajar**. Sudah dirapikan dari tempelan chat awal: judul + isi disinkronkan ke model hub, kalimat penutup percakapan dihapus. `docs/plan.md` = snapshot rencana awal (arsip) |
 | H10 | ✅ **Beres** | Dahulu: tidak ada README untuk hub itu sendiri | Arsitektur hub hanya terdokumentasi di dokumen ini | Sekarang `src/README.md`: peta file + dua keputusan yang mudah salah paham (hub meng-import `App.jsx` bukan `main.jsx`; demo dimuat malas). Tautan dua arah sudah dipasang dari/ke §12 dokumen ini |
 | H11 | ✅ **Beres** | Dahulu: port dev **5173** dipakai hub dan modul mandiri bersamaan | Tidak bisa menjalankan keduanya barengan | Hub kini di **5200** dengan `strictPort: true`; modul tetap 5173. Terbukti: instance hub kedua mati dengan "Port 5200 is already in use" dan **tidak** diam-diam pindah ke 5201 |
@@ -767,8 +811,8 @@ Diurutkan dari rasio nilai/tenaga tertinggi.
 - [x] ~~**Bereskan H9**~~ — **selesai**: `docs/panduan.md` jadi Panduan Pakai untuk pembelajar, sudah termasuk bagian hub.
 - [x] ~~**ESLint + Prettier (H8)**~~ — **selesai**: lihat §3.4 untuk cara pakai & keputusan cakupannya.
 - [x] ~~**CI sederhana**~~ — **selesai**: `.github/workflows/ci.yml` (lihat §3.5). Matriks Node + probe manual, mencakup lint, `format:check`, eksekusi script Modul 00, dan build hub.
-- [x] ~~**Automated testing**~~ — **selesai**: Vitest 5 + React Testing Library, 7 berkas / 90 uji, mutasi-terbukti (lihat §3.6). Minimal yang diminta (Modul 10: tambah/toggle/hapus) sudah ada, plus penjaga struktur, materi ajar, dan perkakas disk.
-- [x] ~~**Reduksi duplikasi `node_modules`**~~ (permintaan pemilik, di luar daftar ini) — **selesai, lalu diperluas**: `scripts/dedup-modules.sh` + `npm run setup:shared`, 37 uji perilaku, stamen anti-run-butabuta, dan lintasan `--akar` yang membuat 64 paket di `node_modules` root ikut berbagi blok dengan donor — **±436 MB** blok fisik dilepas di mesin ini (412.884 KB dari sembilan pohon modul + 32.928 KB dari root; lihat §4). Bukan perubahan struktur: H3 tetap won't-fix (§7.1), tiap modul tetap mandiri.
+- [x] ~~**Automated testing**~~ — **selesai**: Vitest 5 + React Testing Library, 7 berkas / 91 uji, mutasi-terbukti (lihat §3.6). Minimal yang diminta (Modul 10: tambah/toggle/hapus) sudah ada, plus penjaga struktur, materi ajar, dan perkakas disk.
+- [x] ~~**Reduksi duplikasi `node_modules`**~~ (permintaan pemilik, di luar daftar ini) — **selesai, lalu diperluas**: `scripts/dedup-modules.sh` + `npm run setup:shared`, 38 uji perilaku, stamen anti-run-butabuta, dan lintasan `--akar` yang membuat 64 paket di `node_modules` root ikut berbagi blok dengan donor — **±436 MB** blok fisik dilepas di mesin ini (412.884 KB dari sembilan pohon modul + 32.928 KB dari root; lihat §4). Bukan perubahan struktur: H3 tetap won't-fix (§7.1), tiap modul tetap mandiri.
 - [x] ~~**Perluasan cakupan CI ke build mandiri tiap modul**~~ — **selesai**: job `isi-matriks` + `modul` (§3.5). Daftar folder dibaca dari disk, jadi modul baru tidak bisa lolos tanpa ikut diperiksa.
 
 ### mid — 1–2 hari masing-masing
@@ -829,6 +873,7 @@ Diurutkan dari rasio nilai/tenaga tertinggi.
 | `setup:shared -- --akar` melaporkan `BEDA node_modules/<paket>` | Paket itu di root isinya tidak sama dengan donor — biasanya karena `npm install` root menaikkan versi satu paket | Biarkan: skrip tidak akan menimpanya tanpa `--force`. Yang menyesatkan adalah **jumlahnya**: kalau `BEDA` muncul untuk SEMUA paket (ratusan) padahal tidak ada yang berubah, itu hampir pasti bug di pembacaan pohon, bukan keadaan disk — pernah terjadi nyata lewat `process.argv.slice(2)` di dalam `node -e` (argv `-e` tidak punya slot path skrip, jadi `slice(1)`), yang membuat root terbaca KOSONG tanpa error — satu-satunya jejaknya waktu itu peringatan deprecation `DEP0187` dari node |
 | `--akar` melaporkan `BEDA node_modules/<paket>` untuk satu paket yang tidak masuk akal (mis. `esbuild` berukuran dua kali lipat) | Isi `node_modules` root pernah dirusak eksperimen di dokumen ini sendiri: menyisip 10 MB byte nol ke berkas `esbuild/bin/esbuild` untuk membuktikan CoW. Yang harus diketahui: pohon ini **tidak ada di git**, jadi `git checkout` tidak akan memulihkannya | Pemulihan yang benar justru lewat perkakas ini: `cp -c <donor>/node_modules/<paket> node_modules/<paket>` (atau `npm run setup:shared -- --akar --force` untuk semua paket yang menyimpang), lalu buktikan dengan `./node_modules/esbuild/bin/esbuild --version` (`0.25.12`) — bukan hanya dengan md5. Untuk menguji CoW, tulis byte **yang sama nilainya** seperti sudah terukur di §4: isi tidak berubah, hanya bloknya yang terpisah |
 | `--akar` melaporkan `0 paket sekarang berbagi \| 64 sudah berbagi` padahal run ini run pertama | Tidak mungkin terjadi pada run pertama yang benar; yang paling mungkin adalah run **berikutnya** setelah pengisian — dan memang tidak ada kerja tersisa | Bukan kegagalan. Kalau sebaliknya (muncul `BEDA` untuk paket yang baru saja ditandai bersama), periksa apakah penanda `.dedup-shared` ikut terhitung oleh sidik: ia harus dilewati dari **penghitung rekursif**, bukan dari daftar `ABAIKAN` tingkat-toping |
+| `--akar --copy` melaporkan `N paket sekarang disalin dari …` dan `TIDAK ada blok yang dihemat (mekanika salinan penuh)` | Volume tanpa reflink, jadi pertukaran root memakai salinan penuh. Ini **bukan** penolakan: keputusan paket mana yang boleh ditukar tetap ditegakkan, hanya hematnya yang tidak ada | Biarkan kalau memang sedang di ext4/NFS (di CI inilah jalur itu diuji). Kalau ingin hemat blok, jalankan di volume ber-reflink tanpa `--copy`. Jangan "memperbaiki" skripnya dengan mengembalikan cabang `AKAR dilewati — tanpa reflink`: itu perilaku versi pertama `e4ce457`, dan persis itu yang membuat run `39795900782` MERAH di CI sementara laptop APFS hijau (§3.5) |
 | **Semua** modul dilaporkan `BEDA` sekaligus, padahal tidak ada yang menyentuhnya | Yang berubah pohon **donor** (mis. `01-hello-component` habis `npm install`) — sidik tiap klon masih cocok dengan salinannya sendiri, tapi tidak dengan donor sekarang | Bukan tanda rusak; justru ini yang tidak bisa dilihat tanpa stamen. Isi ulang dari donor sekarang: `npm run setup:shared -- --force` |
 | `npm run setup:shared` terasa lambat di mesin yang sudah terisi (±5 detik, padahal dulunya <1 detik) | Dia menyidik sepuluh pohon (jalur + ukuran, bukan isi) untuk membuktikan "masih setara" | Bukan regresi: itulah harga informasi yang membuat `--force` tidak lagi buta, dan mesin yang belum pernah diisi tidak membayar apa pun (tidak ada stamen → tidak ada penyidikan) |
 | Field `berkas=` di `node_modules/.dedup-stamp` kosong | Stamen ditulis oleh versi skrip sebelum perbaikan bug subshell (§3.6) | Tidak ada konsekuensi fungsional (`sidik=` tetap benar); jalankan `--force` sekali untuk menulis ulang stamen yang lengkap |
@@ -881,4 +926,4 @@ Urutan kurikulum dan konsep yang ditanam — berguna kalau mau menambah modul ag
 
 ## 13. Ringkasan Satu Paragraf
 
-Proyek ini adalah kursus React 12 modul berbahasa Indonesia yang berjalan di dua mode: hub terpadu di root (Vite + React 19 + React Router 7 + react-markdown, semua demo 01-10 dimuat via `React.lazy`, modul 00/11 dibaca via `?raw`, port 5200) dan modul mandiri per folder (port 5173). Semua terverifikasi lewat build, browser, dan **90 uji otomatis**, di repository Git publik dengan CI empat job yang hijau di `main` (terakhir: 14 job, 13 lulus + probe ter-*skip*): matriks Node, probe versi, sepuluh build modul mandiri, dan pemeriksaan gaya dasar di `dist`. Kursusnya sendiri sudah terbuka untuk pembelajar di <https://kursus-react.vercel.app>, di-deploy manual dari CLI dan **bukan** dari CI (§3.7). Hutang teknis yang terdaftar di §7 sudah tertutup semua: yang tersisa bukan pekerjaan tertunda, tapi **keputusan yang sengaja diambil** (H3 dan H5 won't-fix, §7.1 — harga duplikasi H3 sudah diturunkan perkakas §4 tanpa mengubah strukturnya; Prettier tidak menyentuh materi ajar, §3.4) dan fitur baru di backlog §8 yang nilainya pedagogis, bukan rekayasa. Mulailah dari sana kalau memang mau menambah fitur -- bukan dari merapikan yang sudah ada.
+Proyek ini adalah kursus React 12 modul berbahasa Indonesia yang berjalan di dua mode: hub terpadu di root (Vite + React 19 + React Router 7 + react-markdown, semua demo 01-10 dimuat via `React.lazy`, modul 00/11 dibaca via `?raw`, port 5200) dan modul mandiri per folder (port 5173). Semua terverifikasi lewat build, browser, dan **91 uji otomatis**, di repository Git publik dengan CI empat job yang hijau di `main` (terakhir: 14 job, 13 lulus + probe ter-*skip*): matriks Node, probe versi, sepuluh build modul mandiri, dan pemeriksaan gaya dasar di `dist`. Kursusnya sendiri sudah terbuka untuk pembelajar di <https://kursus-react.vercel.app>, di-deploy manual dari CLI dan **bukan** dari CI (§3.7). Hutang teknis yang terdaftar di §7 sudah tertutup semua: yang tersisa bukan pekerjaan tertunda, tapi **keputusan yang sengaja diambil** (H3 dan H5 won't-fix, §7.1 — harga duplikasi H3 sudah diturunkan perkakas §4 tanpa mengubah strukturnya; Prettier tidak menyentuh materi ajar, §3.4) dan fitur baru di backlog §8 yang nilainya pedagogis, bukan rekayasa. Mulailah dari sana kalau memang mau menambah fitur -- bukan dari merapikan yang sudah ada.

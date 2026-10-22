@@ -334,6 +334,13 @@ describe("berbagi blok di node_modules root (--akar)", () => {
   const jalanAkar = (extra = []) =>
     jalankan(["--akar", ...extra], { PREFIX_DIR: "node_modules" });
   const penanda = (paket) => join(akar, paket, ".dedup-shared");
+  // Yang dijaga blok ini adalah KEPUTUSAN (paket mana yang boleh ditukar), dan
+  // keputusan itu harus terbukti di kedua mekanika: di APFS paketnya berbagi blok,
+  // di CI (ext4, `--copy` selalu dipakai jalankan()) isinya disalin ulang. Skrip
+  // sengaja memakai kata yang berbeda supaya tidak pernah mengklaim "berbagi blok"
+  // saat tidak ada blok yang dibagi -- karena itu ujinya menerima kedua bentuk.
+  const paketDitukar = (n) =>
+    new RegExp(`${n} paket sekarang (berbagi blok dengan|disalin dari)`);
 
   beforeAll(() => {
     rmSync(fixture, { recursive: true, force: true });
@@ -390,9 +397,7 @@ describe("berbagi blok di node_modules root (--akar)", () => {
   it("paket yang isinya identik ditandai berbagi, termasuk yang scoped", () => {
     const hasil = jalanAkar();
     expect(hasil.status).toBe(0);
-    expect(hasil.stdout).toMatch(
-      /2 paket sekarang berbagi blok dengan 01-donor/
-    );
+    expect(hasil.stdout).toMatch(paketDitukar(2));
     expect(existsSync(penanda("react"))).toBe(true);
     expect(existsSync(penanda("@scope/util"))).toBe(true);
     // isi tetap sama seperti donor
@@ -448,7 +453,7 @@ describe("berbagi blok di node_modules root (--akar)", () => {
       '{"name":"react","lok":"saya"}'
     );
     const hasil = jalanAkar(["--force"]);
-    expect(hasil.stdout).toMatch(/1 paket sekarang berbagi blok/);
+    expect(hasil.stdout).toMatch(paketDitukar(1));
     expect(
       readFileSync(join(akar, "hanya-donor", "package.json"), "utf8")
     ).not.toMatch("saya");
@@ -458,9 +463,46 @@ describe("berbagi blok di node_modules root (--akar)", () => {
 
   it("menjalankan lagi tidak mengerjakan apa pun (idempoten)", () => {
     const hasil = jalanAkar();
-    expect(hasil.stdout).toMatch(/0 paket sekarang berbagi blok/);
+    expect(hasil.stdout).toMatch(paketDitukar(0));
     expect(hasil.stdout).toMatch(/2 sudah berbagi dari sebelumnya/);
     expect(hasil.stdout).toMatch(/0 BEDA tidak disentuh/);
+  });
+
+  it("di volume tanpa reflink keputusan root TETAP jalan, tanpa mengklaim hemat blok", () => {
+    // cp palsu meniru CI/ext4 secara deterministik, bahkan di mesin APFS sekali
+    // pun: `-c` selalu gagal, sisanya diteruskan ke /bin/cp. Uji ini adalah regresi
+    // yang MERAH di run 39795900782: lintasan --akar dulu memilih "dilewati" saat
+    // tidak ada reflink, jadi sembilan keputusan di blok ini hanya hijau di laptop.
+    const binPalsu = join(tmpdir(), "uji-dedup-fakebin-akar");
+    mkdirSync(binPalsu, { recursive: true });
+    writeFileSync(
+      join(binPalsu, "cp"),
+      '#!/bin/sh\nfor a in "$@"; do if [ "$a" = "-c" ]; then echo "cp: clonefile failed: Operation not supported" >&2; exit 1; fi; done\nexec /bin/cp "$@"\n',
+      { mode: 0o755 }
+    );
+    // satu paket identik yang belum pernah ditandai, supaya ada yang ditukar
+    mkdirSync(join(donor, "peraga-salin"), { recursive: true });
+    writeFileSync(join(donor, "peraga-salin", "package.json"), '{"name":"x"}');
+    mkdirSync(join(akar, "peraga-salin"), { recursive: true });
+    writeFileSync(join(akar, "peraga-salin", "package.json"), '{"name":"x"}');
+    const hasil = spawnSync("bash", [skrip, "--akar", "--copy"], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        REPO_DIR: fixture,
+        PREFIX_DIR: "node_modules",
+        PATH: `${binPalsu}:${process.env.PATH}`,
+      },
+    });
+    rmSync(binPalsu, { recursive: true, force: true });
+    expect(hasil.status).toBe(0);
+    expect(hasil.stdout).toMatch(/1 paket sekarang disalin dari 01-donor/);
+    expect(hasil.stdout).toMatch(/TIDAK ada blok yang dihemat/);
+    expect(hasil.stdout).not.toMatch(/berbagi blok dengan 01-donor/);
+    // keputusannya sendiri tetap ditegakkan: paket ditandai, isinya jadi donor
+    expect(existsSync(penanda("peraga-salin"))).toBe(true);
+    rmSync(join(donor, "peraga-salin"), { recursive: true, force: true });
+    rmSync(join(akar, "peraga-salin"), { recursive: true, force: true });
   });
 
   it("tidak meninggalkan berkas sementara di pohon akar", () => {

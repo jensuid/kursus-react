@@ -562,20 +562,31 @@ done
 # ---- lintasan paket root (--akar) --------------------------------------------
 # Lihat catatan di header: root tidak bisa ditukar seluruhnya karena lockfile-nya
 # beda, jadi yang dikerjakan hanyalah paket tingkat-satu yang sidiknya sama persis
-# punya donor. Paket yang BEDA tidak disentuh sama sekali.
+# dengan punya donor. Paket yang BEDA tidak disentuh sama sekali.
+#
+# Lintasan ini TETAP jalan di volume tanpa reflink (--copy). Isi paket yang ditukar
+# sudah terbukti identik, jadi salinan penuh tidak menambah apa pun yang sudah ada
+# -- hanya tidak menghemat. Menolaknya (perilaku versi pertama skrip ini) justru
+# menghapus alasan `--copy` ada: keputusan "paket mana yang boleh ditukar" tidak
+# akan teruji di CI (ext4), dan sembilan uji blok itu akan hijau di APFS saja --
+# persis kegagalan yang sudah pernah terjadi di repo ini untuk perulangan modul.
 kb_akar_sebelum=0
 if [ "$akar" -eq 1 ]; then
   echo ""
   if [ "$prefix_rel" = "$donor" ]; then
     echo "AKAR   dilewati — PREFIX_DIR menunjuk ke pohon donor itu sendiri."
-  elif [ "$mekanika" != "clone" ]; then
-    echo "AKAR   dilewati — tanpa reflink, menyalin paket ke root justru MENAMBAH disk."
-    echo "       Root dibiarkan apa adanya; pakai default (tanpa --copy) di volume APFS."
   elif [ ! -d "${donor}/node_modules" ]; then
     echo "AKAR   dilewati — pohon donor tidak ada."
   elif [ ! -d "$prefix_rel" ]; then
     echo "AKAR   dilewati — $prefix_rel tidak ada, jadi tidak ada yang bisa dibagi."
   else
+    if [ "$mekanika" = "clone" ]; then
+      kata_bagian="berbagi blok dengan"
+    else
+      kata_bagian="disalin dari"
+      echo "AKAR   mekanika salinan penuh: paket ditukar dengan salinan donor yang isinya sama."
+      echo "       Tidak ada blok yang dihemat — inilah jalur tempat keputusan root diuji di CI."
+    fi
     kb_akar_sebelum="$(kb_tersedia)"
     paket_sudah=0
     paket_bagikan=0
@@ -667,9 +678,13 @@ if [ "$akar" -eq 1 ]; then
       echo "AKAR   $prefix_rel: $paket_bagikan paket identik akan berbagi ($byte_bagikan byte), $paket_sudah sudah berbagi, $paket_beda BEDA tidak disentuh, $paket_asli hanya ada di root, $paket_donor_only belum ada di root"
     else
       sesudah_akar_kb="$(kb_tersedia)"
-      echo "AKAR   $prefix_rel: $paket_bagikan paket sekarang berbagi blok dengan $donor, $paket_sudah sudah berbagi dari sebelumnya, $paket_beda BEDA tidak disentuh, $paket_asli hanya ada di root"
+      echo "AKAR   $prefix_rel: $paket_bagikan paket sekarang $kata_bagian $donor, $paket_sudah sudah berbagi dari sebelumnya, $paket_beda BEDA tidak disentuh, $paket_asli hanya ada di root"
       if [ "$paket_bagikan" -gt 0 ]; then
-        echo "       Isi yang tidak lagi disimpan dua kali: $byte_bagikan byte (logis); blok fisik yang berubah di volume: $((kb_akar_sebelum - sesudah_akar_kb)) KB"
+        if [ "$mekanika" = "clone" ]; then
+          echo "       Isi yang tidak lagi disimpan dua kali: $byte_bagikan byte (logis); blok fisik yang berubah di volume: $((kb_akar_sebelum - sesudah_akar_kb)) KB"
+        else
+          echo "       Isi yang berhenti disalin dua kali: $byte_bagikan byte — TIDAK ada blok yang dihemat (mekanika salinan penuh)."
+        fi
       fi
     fi
   fi
