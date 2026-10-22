@@ -1,7 +1,7 @@
 # Dokumen Hand-off — Kursus React + Hub Terpadu
 
 > **Untuk:** developer/pengajar yang melanjutkan proyek ini
-> **Lokasi:** `/Volumes/JensData/Jensu-Projects/frontend-basic/react-ui`
+> **Lokasi:** folder hasil clone (`react-ui/`)
 > **Status:** Fitur lengkap & terverifikasi. **Sudah masuk version control** (branch `main`, commit awal `772d5c7`). Siap dilanjutkan.
 > **Baca pertama:** bagian [Mulai Cepat](#mulai-cepat) lalu [Hutang Teknis](#hutang-teknis--kendala-yang-diketahui).
 
@@ -31,7 +31,7 @@ Prinsip desain yang **jangan dilanggar** saat mengembangkan:
 ## 2. Mulai Cepat
 
 ```bash
-cd /Volumes/JensData/Jensu-Projects/frontend-basic/react-ui
+cd react-ui            # folder hasil clone
 npm install          # sekali di root (±20 detik)
 npm run dev          # http://localhost:5173
 ```

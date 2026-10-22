@@ -1,7 +1,7 @@
 # Kursus React Terstruktur — Dari ES6 Sampai Mampu Membuat App Sendiri
 
 ## Ringkasan
-Membuat 12 modul pembelajaran bertahap di `/Volumes/JensData/Jensu-Projects/frontend-basic/react-ui`. Setiap modul = folder dengan **README penjelasan konseptus (bahasa Indonesia)** + **kode yang bisa langsung dijalankan**. Alur: pra-ES6 → fundamental React → state & data → hooks lanjutan → proyek akhir.
+Membuat 12 modul pembelajaran bertahap di folder `react-ui/`. Setiap modul = folder dengan **README penjelasan konsep (bahasa Indonesia)** + **kode yang bisa langsung dijalankan**. Alur: pra-ES6 → fundamental React → state & data → hooks lanjutan → proyek akhir.
 
 ## Struktur Folder
 
