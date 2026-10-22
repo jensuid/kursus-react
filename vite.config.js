@@ -28,5 +28,13 @@ export default defineConfig({
     // isi folder modul, bukan hanya kode hub.
     include: ["tests/**/*.test.{js,jsx}"],
     clearMocks: true,
+    // Batas waktu per uji dinaikkan dari bawaan 5 detik. Terukur di mesin ini:
+    // "merender tiga tugas bawaan" butuh ±3 detik kalau berkas itu jalan
+    // sendirian, dan pernah MELEWATI 5 detik (merah sekali di suite penuh,
+    // hijau saat diulang) ketika suite dedup spawn puluhan proses bash/find/node
+    // bersamaan. Yang longgar adalah lingkungannya, bukan ujininya -- jangan
+    // dibaca sebagai "uji ini memang lambat". Sumber sesungguhnya tercatat di
+    // §3.6 HANDOFF: jsdom dibuat 7 kali.
+    testTimeout: 20000,
   },
 });

@@ -58,15 +58,20 @@ function bikinModul(nama, isiLockfile, denganNodeModules = false) {
 }
 
 function jalankan(argumen = [], env = {}) {
-  return spawnSync("bash", [skrip, ...argumen], {
+  return spawnSync("bash", [skrip, ...argumen, "--copy"], {
     encoding: "utf8",
     env: { ...process.env, REPO_DIR: fixture, ...env },
   });
 }
 
 // `cp -c` hanya berhasil di filesystem yang mendukung reflink (APFS/btrfs).
-// Di luar itu, jalur klonnya tidak bisa diuji — bukan berarti tidak dijaga:
-// kontrol negatif di blok "tanpa dukungan clone" tetap jalan di mana saja.
+// Yang tidak bisa diuji di luar APFS adalah MEKANIKA klon (CoW, hemat blok) --
+// untuk itu blok "jalur clone sungguhan" pakai describe.runIf. Keputusan "folder
+// mana yang boleh disentuh" tetap diuji di filesystem mana pun karena semua
+// pemanggilan skrip lewat jalankan() membawa --copy: tanpa itu, empat uji
+// penjaga mati di runner CI (ext4) karena skrip menolak sebelum sempat memilih
+// folder. Pernah terjadi nyata: suite hijau di mesin, MERAH di CI untuk alasan
+// lingkungan, bukan alasan logika.
 const mendukungClone = (() => {
   const uji = join(tmpdir(), "uji-dedup-reflink");
   try {
@@ -185,6 +190,13 @@ describe("penjaga lockfile dan pohon yang sudah ada", () => {
     expect(existsSync(join(fixture, "03-bedanya", "node_modules"))).toBe(false);
   });
 
+  it("menerima --copy sebagai jalur salinan penuh yang sah", () => {
+    // Tanpa flag ini, `jalankan()` akan selalu kena "Argumen tidak dikenal" dan
+    // seluruh blok di atas tidak menguji apa pun.
+    const hasil = jalankan(["--dry-run"]);
+    expect(hasil.stderr).not.toMatch(/Argumen tidak dikenal/);
+  });
+
   it("tidak meninggalkan berkas sementara di mana pun", () => {
     const sisa = jalankanSisa();
     expect(sisa).toEqual([]);
@@ -204,10 +216,14 @@ describe("data repo yang sebenarnya", () => {
     () => {
       // Ini inti klaim hemat disk: kalau normalisasi salah, skrip akan bilang
       // "tidak setara" untuk semua folder dan tidak ada yang terisi -- tanpa error.
-      const hasil = spawnSync("bash", [skrip, "--dry-run", "--force"], {
-        encoding: "utf8",
-        env: { ...process.env, REPO_DIR: repoRoot },
-      });
+      const hasil = spawnSync(
+        "bash",
+        [skrip, "--dry-run", "--force", "--copy"],
+        {
+          encoding: "utf8",
+          env: { ...process.env, REPO_DIR: repoRoot },
+        }
+      );
       expect(hasil.status).toBe(0);
       const akanDiganti = (hasil.stdout.match(/RENCANA/g) || []).length;
       expect(akanDiganti).toBe(9);
@@ -308,26 +324,31 @@ describe.runIf(mendukungClone)("jalur clone sungguhan", () => {
   });
 });
 
-describe("kalau filesystem tidak mendukung clone", () => {
+describe("volume tanpa reflink: penolakan dulu, --copy belakangan", () => {
+  // cp palsu meniru ext4/NFS/dosfs secara DETERMINISTIK: `-c` selalu gagal,
+  // sisanya diteruskan ke /bin/cp. Ini satu-satunya cara menguji jalur
+  // non-reflink di mesin APFS juga -- runner CI membuktikannya dari sisi lain.
+  const binPalsu = join(tmpdir(), "uji-dedup-fakebin");
   beforeAll(() => {
     rmSync(fixture, { recursive: true, force: true });
     mkdirSync(fixture, { recursive: true });
     bikinModul("01-donor", sama, true);
     bikinModul("02-kosong", sama);
-  });
-
-  it("berhenti sebelum ada yang menghapus, dan mengarahkan ke npm install", () => {
-    // cp palsu: -c selalu gagal, meniru ext4/NFS/dosfs dan runner CI Linux.
-    const binPalsu = join(tmpdir(), "uji-dedup-fakebin");
     rmSync(binPalsu, { recursive: true, force: true });
     mkdirSync(binPalsu, { recursive: true });
-    const cpPalsu = join(binPalsu, "cp");
     writeFileSync(
-      cpPalsu,
+      join(binPalsu, "cp"),
       '#!/bin/sh\nfor a in "$@"; do if [ "$a" = "-c" ]; then echo "cp: clonefile failed: Operation not supported" >&2; exit 1; fi; done\nexec /bin/cp "$@"\n',
       { mode: 0o755 }
     );
-    const hasil = spawnSync("bash", [skrip], {
+  });
+
+  afterAll(() => {
+    rmSync(binPalsu, { recursive: true, force: true });
+  });
+
+  const tanpaReflink = (argumen) =>
+    spawnSync("bash", [skrip, ...argumen], {
       encoding: "utf8",
       env: {
         ...process.env,
@@ -335,10 +356,48 @@ describe("kalau filesystem tidak mendukung clone", () => {
         PATH: `${binPalsu}:${process.env.PATH}`,
       },
     });
-    rmSync(cpPalsu, { force: true });
+
+  it("tanpa --copy: berhenti sebelum ada yang menghapus, dan mengarahkan ke npm install", () => {
+    const hasil = tanpaReflink([]);
     expect(hasil.status).toBe(1);
-    expect(hasil.stdout + hasil.stderr).toMatch(/tidak mendukung clone/);
+    const keluaran = hasil.stdout + hasil.stderr;
+    expect(keluaran).toMatch(/tidak mendukung clone/);
+    expect(keluaran).toMatch("npm install");
+    // Petunjuk jalurnya harus disebut, kalau tidak pengguna dibiarkan menebak.
+    expect(keluaran).toMatch(/--copy/);
     expect(existsSync(join(fixture, "02-kosong", "node_modules"))).toBe(false);
+  });
+
+  it("dengan --copy: keputusan yang sama tetap jalan, mekanikanya salinan penuh", () => {
+    const hasil = tanpaReflink(["--copy"]);
+    expect(hasil.status).toBe(0);
+    // Regresi urutan kunci donor juga terbukti di jalur ini, bukan cuma di APFS.
+    expect(hasil.stdout).toMatch(/Donor: 01-donor \(lockfile [0-9a-f]{32}\)/);
+    expect(hasil.stdout).toMatch(/ISI\s+02-kosong/);
+    expect(hasil.stdout).toMatch(/salinan penuh/);
+    for (const berkas of [
+      "react/package.json",
+      "vite/package.json",
+      ".bin/vite",
+    ]) {
+      expect(
+        existsSync(join(fixture, "02-kosong", "node_modules", berkas))
+      ).toBe(true);
+    }
+    expect(jalankanSisa()).toEqual([]);
+  });
+
+  it("--copy tetap menghormati penjaga lockfile dan folder yang sudah terisi", () => {
+    mkdirSync(join(fixture, "03-bedanya", "src"), { recursive: true });
+    writeFileSync(join(fixture, "03-bedanya", "vite.config.js"), "x\n");
+    writeFileSync(join(fixture, "03-bedanya", "package.json"), "{}");
+    writeFileSync(
+      join(fixture, "03-bedanya", "package-lock.json"),
+      `{ "name": "03-bedanya", "lockfileVersion": 3, "packages": ${beda} }\n`
+    );
+    const hasil = tanpaReflink(["--copy", "--force"]);
+    expect(hasil.stdout).toMatch(/LEWAT\s+03-bedanya/);
+    expect(existsSync(join(fixture, "03-bedanya", "node_modules"))).toBe(false);
   });
 });
 
