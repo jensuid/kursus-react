@@ -128,6 +128,18 @@ jobs:
       - name: Versi yang terpakai
         run: node -v && npm -v
 
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run build
+      # Tiap pemeriksaan berdiri sendiri (continue-on-error per langkah),
+      # supaya kegagalan pertama tidak menyembunyikan hasil yang berikut.
+      # Probe ada untuk mengumpulkan informasi, bukan untuk berhenti dini.
+      # (Di job `hub` urutan ketat justru yang diinginkan: gagal cepat.)
+      - name: npm ci
+        continue-on-error: true
+        run: npm ci
+
+      - name: Lint
+        continue-on-error: true
+        run: npm run lint
+
+      - name: Build
+        continue-on-error: true
+        run: npm run build
