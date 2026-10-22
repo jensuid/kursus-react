@@ -252,7 +252,7 @@ sisanya masih terbuka.
 | H6 | ⬜ Terbuka | **Markdown 11 dirender mentah** di `<pre>`, bukan HTML | Kurang nyaman dibaca, heading/code block polos | Tambah renderer ringan (`marked`/`react-markdown`) **hanya di hub** agar modul tetap bebas dependensi |
 | H7 | ⬜ Terbuka | **Tombol "Salin" butuh secure context** (`navigator.clipboard`) | Gagal diam-diam saat diakses via HTTP non-localhost/jaringan | Sudah ada `try/catch`, tapi beri fallback `document.execCommand('copy')` atau tampilkan teks saja |
 | H8 | 🟡 **Sebagian beres** | Dahulu: tidak ada ESLint/Prettier sama sekali | Regresi tak terdeteksi | **Sudah ada**: ESLint 10 flat config (`eslint.config.js`) + Prettier 3 (lihat §3.4). Sisa: **automated testing** (Vitest + React Testing Library) dan **CI** (workflow `npm ci && npm run lint && npm run build`) |
-| H9 | ⬜ Terbuka | `docs/panduan.md` **kosong (0 byte)** | Membingungkan, tampak seperti file rusak | Isi atau hapus. `docs/plan.md` = snapshot rencana awal (dipertahankan sebagai arsip) |
+| H9 | ✅ **Beres** | Dahulu: `docs/panduan.md` kosong 0 byte | Membingungkan | Sekarang **Panduan Pakai untuk Pembelajar**. Sudah dirapikan dari tempelan chat awal: judul + isi disinkronkan ke model hub, kalimat penutup percakapan dihapus. `docs/plan.md` = snapshot rencana awal (arsip) |
 | H10 | ⬜ Terbuka | **Tidak ada `README` untuk hub itu sendiri** di `src/` | Arsitektur hub hanya terdokumentasi di sini | Pertimbangkan `src/README.md` singkat |
 | H11 | ⬜ Terbuka | Port dev **5173** dipakai hub; modul mandiri juga 5173 | Tidak bisa menjalankan hub + modul bersamaan tanpa berebut port | Jalankan salah satu, atau `npm run dev -- --port 5180` |
 
@@ -266,7 +266,7 @@ Diurutkan dari rasio nilai/tenaga tertinggi.
 
 - [x] ~~**Bereskan H1 + H2**~~ — **selesai**: repo Git di branch `main`, commit awal `772d5c7`, 10 folder `dist/` basi dihapus.
 - [x] ~~**Tambah remote + push**~~ — **selesai**: `origin` = `https://github.com/jensuid/kursus-react` (public), `main` tracking `origin/main`.
-- [ ] **Bereskan H9**: hapus/isi `docs/panduan.md`.
+- [x] ~~**Bereskan H9**~~ — **selesai**: `docs/panduan.md` jadi Panduan Pakai untuk pembelajar, sudah termasuk bagian hub.
 - [x] ~~**ESLint + Prettier (H8)**~~ — **selesai**: lihat §3.4 untuk cara pakai & keputusan cakupannya.
 - [ ] **CI sederhana**: workflow `npm ci && npm run lint && npm run build` di root.
 - [ ] **Automated testing**: Vitest + React Testing Library (minimal uji modul 10: tambah/toggle/hapus todo).
@@ -344,6 +344,7 @@ Urutan kurikulum dan konsep yang ditanam — berguna kalau mau menambah modul ag
 ## 12. Referensi Silang
 
 - `README.md` (root) — peta kurikulum + cara pakai untuk **pembelajar** (lebih ringkas dari dokumen ini).
+- `docs/panduan.md` — langkah demi langkah memakai kursus, untuk **pembelajar**.
 - `docs/plan.md` — snapshot rencana awal (arsip; jangan diedit sebagai sumber kebenaran).
 - `11-next-steps.md` — kurikulum lanjutan, dirender di rute `/modul/11`.
 - Tiap `<modul>/README.md` — teori per modul.

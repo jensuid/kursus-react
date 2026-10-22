@@ -1,4 +1,7 @@
-Berikut cara menggunakan kursus React ini dari awal sampai akhir.
+# Panduan Pakai — Untuk Pembelajar
+
+Cara menjalankan dan mengerjakan kursus ini dari awal sampai akhir.
+Butuh daftar modul & estimasi waktu? Lihat [README.md](../README.md).
 
 ## 1. Persiapan (sekali saja)
 
@@ -8,7 +11,24 @@ node -v
 ```
 Kalau muncul versi (misal `v22.x`), siap. Kursus ini sudah ada di folder yang sedang kamu buka.
 
-## 2. Mulai dari Modul 00 (yang sedang kamu buka)
+## 2. Cara paling nyaman: Hub (semua modul di satu tempat)
+
+Tidak perlu pindah folder satu-satu. Dari root proyek:
+
+```bash
+npm install      # sekali saja
+npm run dev      # buka http://localhost:5173
+```
+
+Klik modul di sidebar untuk membukanya; demo modul 01-10 benar-benar berjalan
+di dalam halaman itu. Modul 00 (ES6) dan 11 (panduan) ditampilkan sebagai bacaan.
+Tombol **Salin** di tiap halaman modul menyalur jalur file sumbernya, jadi kamu
+tinggal membuka file itu di editor.
+
+Cara manual di bawah tetap berguna kalau kamu ingin mengisolasi satu modul,
+atau sedang tidak ingin menjalankan hub. Keduanya tidak bentrok.
+
+## 3. Mulai dari Modul 00 (fondasi)
 
 Modul 00 adalah **crash course JavaScript ES6** — fondasi sebelum sentuh React. Modul ini **tidak perlu browser**, cukup terminal:
 
@@ -21,7 +41,7 @@ node 02-destructuring-default.js
 
 Setiap file punya komentar penjelasan + bagian **LATIHAN** di bawah. Kerjakan latihannya (ketik kode tambahan di file itu sendiri).
 
-## 3. Masuk Modul React (01–10) — tiap modul = app yang jalan
+## 4. Masuk Modul React (01–10) — tiap modul = app yang jalan
 
 Untuk modul mana pun (misal Modul 01):
 
@@ -33,7 +53,7 @@ npm run dev        # jalankan → buka http://localhost:5173
 
 Lalu di browser kamu akan melihat app-nya, dan **sambil itu buka file `src/App.jsx`** di editor. Baca komentar di kode berdampingan dengan hasilnya di layar.
 
-## 4. Metode belajar per modul (urutan yang disarankan)
+## 5. Metode belajar per modul (urutan yang disarankan)
 
 1. **Baca `README.md`** modul itu → pahami konsep intinya
 2. **Jalankan** (`npm run dev`) → lihat hasilnya
@@ -42,7 +62,7 @@ Lalu di browser kamu akan melihat app-nya, dan **sambil itu buka file `src/App.j
 5. **Kerjakan bagian "Latihan"** di akhir README
 6. Lanjut modul berikutnya kalau sudah nyaman
 
-## 5. Urutan lengkap
+## 6. Urutan lengkap
 
 | Kalau kamu... | Ke modul |
 |---|---|
@@ -53,13 +73,11 @@ Lalu di browser kamu akan melihat app-nya, dan **sambil itu buka file `src/App.j
 
 **Modul 03 (useState) dan 10 (Todo App)** adalah yang paling penting — jangan buru-buru lewat.
 
-## 6. Berhenti & bersih
+## 7. Berhenti & bersih
 
 - Untuk menghentikan server dev: tekan `Ctrl + C` di terminal
 - Untuk menjalankan modul lain: `cd` ke foldernya, `npm install` sekali, lalu `npm run dev`
 
 ---
 
-Ringkasnya: **README untuk konsep → `npm run dev` untuk melihat → edit kode untuk mencoba → Latihan untuk menguji.** Mulai sekarang dengan menjalankan `node 01-let-const-arrow.js` di folder Modul 00.
-
-Mau saya jalankan salah satu modul sekarang supaya kamu langsung lihat hasilnya?
+Ringkasnya: **README untuk konsep → `npm run dev` untuk melihat → edit kode untuk mencoba → Latihan untuk menguji.** Mulai sekarang dengan menjalankan `node 01-let-const-arrow.js` di folder Modul 00, atau langsung `npm install && npm run dev` di root untuk membuka hub.

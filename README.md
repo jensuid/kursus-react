@@ -67,6 +67,9 @@ node 01-let-const-arrow.js
 
 ## Metode Belajar yang Disarankan
 
+> Langkah demi langkah cara memakai kursus ini (persiapan, hub, urutan modul):
+> lihat **[docs/panduan.md](./docs/panduan.md)**.
+
 Untuk tiap modul:
 
 1. **Baca README-nya** sampai paham konsep intinya (tidak harus hafal).
