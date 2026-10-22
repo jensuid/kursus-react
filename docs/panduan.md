@@ -22,16 +22,21 @@ Tidak perlu pindah folder satu-satu. Dari root proyek:
 
 ```bash
 npm install      # sekali saja
-npm run dev      # buka http://localhost:5173
+npm run dev      # buka http://localhost:5200
 ```
 
 Klik modul di sidebar untuk membukanya; demo modul 01-10 benar-benar berjalan
-di dalam halaman itu. Modul 00 (ES6) dan 11 (panduan) ditampilkan sebagai bacaan.
-Tombol **Salin** di tiap halaman modul menyalur jalur file sumbernya, jadi kamu
-tinggal membuka file itu di editor.
+di dalam halaman itu. Modul 00 (ES6) dan 11 (panduan) ditampilkan sebagai bacaan;
+Modul 11 dirender rapi (judul, daftar, blok kode), bukan teks mentah.
+Tombol **Salin** di tiap halaman modul menyalin jalur file sumbernya, jadi kamu
+tinggal membuka file itu di editor — teksnya berubah jadi "Tersalin!" saat
+berhasil, dan "Gagal menyalin" kalau browser menolak (mis. akses lewat IP tanpa
+HTTPS; di situ masih ada fallback, tapi tidak di semua browser).
 
 Cara manual di bawah tetap berguna kalau kamu ingin mengisolasi satu modul,
-atau sedang tidak ingin menjalankan hub. Keduanya tidak bentrok.
+atau sedang tidak ingin menjalankan hub. Keduanya tidak bentrok: hub memakai
+port **5200**, modul mandiri memakai **5173**, jadi keduanya boleh jalan
+bersamaan.
 
 ## 3. Mulai dari Modul 00 (fondasi)
 

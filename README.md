@@ -12,7 +12,10 @@ Setiap modul berisi **README penjelasan konsep (bahasa Indonesia)** + **kode yan
   modul 01-10, dan bahkan `npm run build` hub semuanya lulus. Yang gagal di 18
   hanya `npm run lint` (ESLint 10 butuh `util.styleText` yang baru ada di
   Node ≥20.12). Jadi: sebagai pembelajar kamu aman di 18; sebagai pengembang/
-  penjaga proyek, pakai 20 ke atas. CI dijaga di `.github/workflows/ci.yml`.
+  penjaga proyek, pakai 20 ke atas — dan **22 ke atas kalau mau menjalankan
+  `npm run test`** (vitest 5 menulis `engines` `^22.12.0 || ^24.0.0 || >=26.0.0`,
+  jsdom 30 `^22.22.2 || ^24.15.0 || >=26.0.0`).
+  CI dijaga di `.github/workflows/ci.yml`.
 - Editor kode (VS Code / Qoder / lainnya)
 - Pengetahuan HTML & CSS dasar
 
@@ -44,11 +47,12 @@ menampilkan modul 00 & 11 sebagai bacaan.
 ```bash
 # dari folder react-ui (root)
 npm install      # sekali saja
-npm run dev      # buka http://localhost:5173
+npm run dev      # buka http://localhost:5200
 ```
 
 Di dalam hub: klik sidebar untuk berpindah modul, dan gunakan tombol **Salin**
-untuk menyalur jalur file sumber/README yang ingin kamu buka & edit di editor.
+untuk menyalin jalur file sumber/README yang ingin kamu buka & edit di editor
+(tombolnya berubah jadi "Tersalin!" kalau berhasil).
 
 > Metode per-modul di bawah tetap bisa dipakai kalau kamu ingin mengisolasi
 > satu modul (misalnya untuk menguji build). Keduanya tidak bentrok.
@@ -62,6 +66,9 @@ cd 01-hello-component   # masuk ke folder modul yang diinginkan
 npm install             # sekali saja per modul (mengunduh dependency)
 npm run dev             # jalankan dev server → buka http://localhost:5173
 ```
+
+Modul memakai port **5173** dan hub memakai **5200**, jadi keduanya boleh
+jalan berbarengan tanpa berebut port.
 
 Edit file di folder `src/` — browser otomatis ter-update (hot reload).
 
