@@ -22,6 +22,8 @@
 #   npm run setup:shared -- --force # ganti pohon yang sudah ada asal versinya setara
 #   npm run setup:shared -- --dry-run
 #   npm run setup:shared -- --copy  # salinan penuh (bukan clone) di volume tanpa reflink
+#   npm run setup:shared -- --akar  # setelah modul, berbagi blok juga untuk paket yang
+#                                   #   sama di node_modules ROOT (butuh reflink, opt-in)
 #
 # Kenapa ada --copy: tanpa reflink, alat ini tidak menghemat apa pun -- ia malah
 # menambah salinan. Karena itu volume tanpa reflink DITOLAK secara default, dan
@@ -37,8 +39,17 @@
 # jari pohon donor; saat membaca, skrip menghitung ulang sidik pohon itu sendiri
 # dan sidik donor sekarang, lalu melapor SIAP (tidak ada kerja) atau BEDA (apa
 # yang berubah). Sidik = jalur + ukuran + target symlink, BUKAN isi berkas: tambalan
-# yang ukurannya persis sama tidak terdeteksi, dan itu disengaja -- membaca 580 MB
+# yang ukurannya persis sama tidak terdeteksi, dan itu disengaja -- membaca ±472 MB
 # tiap dry-run lebih mahal daripada manfaatnya.
+#
+# Kenapa pengisian root (--akar) adalah lintasan TERSENDIRI, bukan bagian dari
+# perulangan modul: node_modules root bukan pohon yang setara dengan donor. Ia
+# punya lockfile sendiri (terukur: kunci fcd67c04 vs 2cb6e7db milik modul) dan
+# 317 paket vs 64 paket donor. Jadi tidak bisa ditukar seluruhnya -- yang boleh
+# dikerjakan hanyalah paket tingkat-satu yang isinya SAMA persis, satu per satu.
+# Karena itu penjaga utamanya bukan lockfile (tidak akan pernah sama) melainkan
+# sidik per paket: bila berbeda, paket itu tidak disentuh sama sekali. Sisa
+# 253 paket root (vitest, express, mongodb, ...) memang tidak ada duanya.
 set -uo pipefail
 
 repo_dir="${REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
@@ -47,13 +58,20 @@ cd "$repo_dir" || { echo "REPO_DIR tidak bisa dibuka: $repo_dir" >&2; exit 1; }
 dry_run=0
 force=0
 copy=0
+akar=0
+# Lintasan --akar bekerja pada direktori mana pun yang ditunjuk PREFIX_DIR; default
+# "node_modules" = pohon di root repo. Hook itu ada supaya keputusan "paket mana
+# yang identik" bisa diuji terhadap objek sungguhan di runner mana pun, bukan hanya
+# di mesin developer yang kebetulan APFS.
+prefix_rel="${PREFIX_DIR:-node_modules}"
 for arg in "$@"; do
   case "$arg" in
     --dry-run) dry_run=1 ;;
     --force) force=1 ;;
     --copy) copy=1 ;;
+    --akar) akar=1 ;;
     *)
-      echo "Argumen tidak dikenal: $arg (yang ada: --dry-run, --force, --copy)" >&2
+      echo "Argumen tidak dikenal: $arg (yang ada: --dry-run, --force, --copy, --akar)" >&2
       exit 2
       ;;
   esac
@@ -277,9 +295,100 @@ nilai_stamen() {
   printf "%s\n" "$1" | awk -F'=' -v k="$2" '$1 == k { print substr($0, length(k) + 2); exit }'
 }
 
+# Tabel gabungan donor x root, satu panggilan node untuk dua pohon. Baris:
+# <aksi>\t<paket>\t<byte> dengan aksi = BAGI (isi sama, belum ditandai),
+# SUDAH (sama dan sudah ditandai sebelumnya), BEDA (nama ada di dua sisi tapi
+# isinya tidak sama), ASLI (hanya ada di root).
+# Kenapa tidak associative array bash: /bin/bash di macOS adalah 3.2.57 dan tidak
+# mendukung `declare -A`, jadi solusi itu akan membuat lintasan ini mati di laptop
+# penulisnya sendiri sementara CI (bash 5) tetap hijau -- kegagalan yang justru
+# paling sulit terlihat.
+peta_bandup() {
+  node -e '
+    const fs = require("node:fs");
+    const crypto = require("node:crypto");
+    const path = require("node:path");
+    // slice(1), BUKAN slice(2): pada `node -e` tidak ada slot path skrip, jadi
+    // argv = [node, arg1, arg2, ...]. Pakai slice(2) di sini diam-diam menelan
+    // argumen pertama dan membuat pohon root terbaca sebagai KOSONG -- tanpa error.
+    const [donorDir, rootDir] = process.argv.slice(1);
+    const ABAIKAN = new Set([".bin", ".vite", ".package-lock.json", ".dedup-stamp"]);
+    const sidik = (dir) => {
+      const baris = [];
+      let byte = 0;
+      const jalan = (d, rel) => {
+        for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+          // Penanda .dedup-shared ditulis skrip ini DI DALAM paket hasil pembagian.
+          // Kalau ikut terhitung, run berikutnya melihat sisi root berbeda dari donor
+          // (yang tidak punya penanda) dan melaporkan 64 BEDA palsu, lalu mengisi ulang
+          // selamanya. Keamanan tetap utuh: penanda hanya dibaca SETELAH sidik cocok,
+          // jadi paket yang berubah tetap dilaporkan BEDA dan tidak pernah ditimpa
+          // tanpa --force.
+          if (e.name === ".dedup-shared") continue;
+          const p = path.join(d, e.name);
+          const nama = rel ? rel + "/" + e.name : e.name;
+          try {
+            if (e.isSymbolicLink()) baris.push(nama + " ->" + fs.readlinkSync(p));
+            else if (e.isDirectory()) jalan(p, nama);
+            else if (e.isFile()) {
+              const s = fs.lstatSync(p).size;
+              byte += s;
+              baris.push(nama + " " + s);
+            } else baris.push(nama + " lain");
+          } catch {
+            baris.push(nama + " ?");
+          }
+        }
+      };
+      jalan(dir, "");
+      baris.sort();
+      return [baris.length, byte, crypto.createHash("md5").update(baris.join("\n")).digest("hex")];
+    };
+    const perPaket = (base) => {
+      const keluaran = new Map();
+      if (!fs.existsSync(base)) return keluaran;
+      for (const e of fs.readdirSync(base, { withFileTypes: true })) {
+        if (ABAIKAN.has(e.name) || e.name.startsWith(".")) continue;
+        const p = path.join(base, e.name);
+        if (!e.isDirectory()) continue;
+        if (e.name.startsWith("@")) {
+          for (const f of fs.readdirSync(p, { withFileTypes: true })) {
+            if (!f.isDirectory()) continue;
+            const r = sidik(path.join(p, f.name));
+            keluaran.set(e.name + "/" + f.name, r);
+          }
+          continue;
+        }
+        keluaran.set(e.name, sidik(p));
+      }
+      return keluaran;
+    };
+    const d = perPaket(donorDir);
+    const r = perPaket(rootDir);
+    const baris = [];
+    for (const [nama, info] of d) {
+      if (!r.has(nama)) {
+        baris.push("HANYA-DONOR\t" + nama + "\t0");
+        continue;
+      }
+      const ri = r.get(nama);
+      if (ri[2] !== info[2]) {
+        baris.push("BEDA\t" + nama + "\t" + ri[1]);
+        continue;
+      }
+      const bertanda = fs.existsSync(path.join(rootDir, nama, ".dedup-shared"));
+      baris.push((bertanda ? "SUDAH\t" : "BAGI\t") + nama + "\t" + info[1]);
+    }
+    for (const [nama] of r) {
+      if (!d.has(nama)) baris.push("ASLI\t" + nama + "\t" + r.get(nama)[1]);
+    }
+    baris.sort();
+    process.stdout.write(baris.join("\n") + "\n");
+  ' "$@"
+}
+
 kb_tersedia() { df -k . | awk 'NR==2{print $4}'; }
 sebelum_kb="$(kb_tersedia)"
-
 diisi=0
 siap=0
 dilewati=0
@@ -450,7 +559,122 @@ for m in "${peta[@]}"; do
   diisi=$((diisi + 1))
 done
 
-sesudah_kb="$(kb_tersedia)"
+# ---- lintasan paket root (--akar) --------------------------------------------
+# Lihat catatan di header: root tidak bisa ditukar seluruhnya karena lockfile-nya
+# beda, jadi yang dikerjakan hanyalah paket tingkat-satu yang sidiknya sama persis
+# punya donor. Paket yang BEDA tidak disentuh sama sekali.
+kb_akar_sebelum=0
+if [ "$akar" -eq 1 ]; then
+  echo ""
+  if [ "$prefix_rel" = "$donor" ]; then
+    echo "AKAR   dilewati — PREFIX_DIR menunjuk ke pohon donor itu sendiri."
+  elif [ "$mekanika" != "clone" ]; then
+    echo "AKAR   dilewati — tanpa reflink, menyalin paket ke root justru MENAMBAH disk."
+    echo "       Root dibiarkan apa adanya; pakai default (tanpa --copy) di volume APFS."
+  elif [ ! -d "${donor}/node_modules" ]; then
+    echo "AKAR   dilewati — pohon donor tidak ada."
+  elif [ ! -d "$prefix_rel" ]; then
+    echo "AKAR   dilewati — $prefix_rel tidak ada, jadi tidak ada yang bisa dibagi."
+  else
+    kb_akar_sebelum="$(kb_tersedia)"
+    paket_sudah=0
+    paket_bagikan=0
+    paket_beda=0
+    paket_asli=0
+    paket_donor_only=0
+    byte_bagikan=0
+    # Pembacaan pakai IFS bawaan (spasi+tab): kolom peta_bandup tidak pernah
+    # mengandung spasi, dan mengandalkan whitespace bawaan berarti tidak ada
+    # karakter tak-terlihat yang bisa hilang saat skrip ini disunting.
+    while read -r aksi paket byte_p; do
+      [ -n "$paket" ] || continue
+      case "$aksi" in
+        SUDAH) paket_sudah=$((paket_sudah + 1)) ;;
+        BEDA)
+          echo "BEDA   $prefix_rel/$paket — isi tidak sama dengan donor, tidak disentuh"
+          if [ "$force" -eq 1 ]; then
+            echo "       --force: paket ini akan ditimpa oleh salinan donor ($paket)"
+            aksi="BAGI-PAKSA"
+          fi
+          paket_beda=$((paket_beda + 1))
+          ;;
+        ASLI) paket_asli=$((paket_asli + 1)) ;;
+        HANYA-DONOR) paket_donor_only=$((paket_donor_only + 1)) ;;
+        BAGI) ;;
+        *)
+          echo "GAGAL  akar — aksi tidak dikenal dari tabel gabungan: $aksi"
+          gagal=$((gagal + 1))
+          ;;
+      esac
+      [ "$aksi" = "BAGI" ] || [ "$aksi" = "BAGI-PAKSA" ] || continue
+      if [ "$dry_run" -eq 1 ]; then
+        echo "RENCANA akar -- bagikan $prefix_rel/$paket dengan $donor ($byte_p byte)"
+        paket_bagikan=$((paket_bagikan + 1))
+        byte_bagikan=$((byte_bagikan + byte_p))
+        continue
+      fi
+      # Isi terbukti identik (BAGI), atau pengguna meminta penggantian paksa
+      # (BAGI-PAKSA lewat --force) walau isinya berbeda. Dua-duanya: klon dulu, periksa, baru sentuh.
+      tmp="$prefix_rel/${paket}.dedup-tmp"
+      lama="$prefix_rel/${paket}.lama-tmp"
+      rm -rf "${tmp:?}" "${lama:?}"
+      # Paket scoped (@vueuse/x) butuh direktori induknya ada sebelum `cp -c -R`
+      # bisa menulis ke sana; `mkdir -p` pada jalur yang sudah ada tidak berbahaya.
+      scope="${paket%"${paket##*[!/]}"}"
+      if [ -n "$scope" ] && ! mkdir -p "$prefix_rel/$scope" 2>/dev/null; then
+        echo "GAGAL  akar $paket — direktori induk $scope tidak bisa dibuat." >&2
+        gagal=$((gagal + 1))
+        continue
+      fi
+      if ! salin_pohon "${donor}/node_modules/$paket" "$tmp" 2>/dev/null; then
+        echo "GAGAL  akar $paket — penyalinan ditolak; pohon asli dibiarkan utuh." >&2
+        rm -rf "${tmp:?}"
+        gagal=$((gagal + 1))
+        continue
+      fi
+      jumlah_tmp="$(find "$tmp" -mindepth 1 | wc -l | tr -d ' ')"
+      jumlah_d="$(find "${donor}/node_modules/$paket" -mindepth 1 | wc -l | tr -d ' ')"
+      if [ ! -d "$tmp" ] || [ "$jumlah_tmp" -ne "$jumlah_d" ]; then
+        echo "GAGAL  akar $paket — klon tidak lengkap ($jumlah_tmp vs donor $jumlah_d); pohon asli TETAP dipakai." >&2
+        rm -rf "${tmp:?}"
+        gagal=$((gagal + 1))
+        continue
+      fi
+      if mv "$prefix_rel/$paket" "$lama" 2>/dev/null &&
+        mv "$tmp" "$prefix_rel/$paket" 2>/dev/null &&
+        rm -rf "${lama:?}" 2>/dev/null; then
+        printf 'paket ini diisi lewat %s --akar dari %s; isinya identik, hanya blok fisiknya dibagi\n' "$0" "$donor" >"$prefix_rel/$paket/.dedup-shared" 2>/dev/null
+        paket_bagikan=$((paket_bagikan + 1))
+        byte_bagikan=$((byte_bagikan + byte_p))
+        continue
+      fi
+      # Pertukaran gagal di tengah. Kembalikan HANYA kalau paketnya memang tidak ada
+      # di tempat: kalau klon sudah masuk ke posisinya, dia yang dipakai dan sisa
+      # pohon lama tinggal dilaporkan -- memindahkannya ke jalur paket saat direktori
+      # itu sudah ada akan menumpuknya KE DALAM paket baru (paket/<nama>.lama-tmp),
+      # kegagalan yang justru sulit terlihat.
+      if [ ! -e "$prefix_rel/$paket" ]; then
+        [ -d "$tmp" ] && rm -rf "${tmp:?}"
+        [ -d "$lama" ] && mv "$lama" "$prefix_rel/$paket" 2>/dev/null
+      fi
+      if [ -d "$lama" ] || [ -d "$tmp" ]; then
+        echo "GAGAL  akar $paket — pertukaran tidak tuntas, sisa DITINGGALKAN untuk diperiksa: $lama $tmp" >&2
+        gagal=$((gagal + 1))
+      fi
+    done < <(peta_bandup "${donor}/node_modules" "$prefix_rel")
+
+    if [ "$dry_run" -eq 1 ]; then
+      echo "AKAR   $prefix_rel: $paket_bagikan paket identik akan berbagi ($byte_bagikan byte), $paket_sudah sudah berbagi, $paket_beda BEDA tidak disentuh, $paket_asli hanya ada di root, $paket_donor_only belum ada di root"
+    else
+      sesudah_akar_kb="$(kb_tersedia)"
+      echo "AKAR   $prefix_rel: $paket_bagikan paket sekarang berbagi blok dengan $donor, $paket_sudah sudah berbagi dari sebelumnya, $paket_beda BEDA tidak disentuh, $paket_asli hanya ada di root"
+      if [ "$paket_bagikan" -gt 0 ]; then
+        echo "       Isi yang tidak lagi disimpan dua kali: $byte_bagikan byte (logis); blok fisik yang berubah di volume: $((kb_akar_sebelum - sesudah_akar_kb)) KB"
+      fi
+    fi
+  fi
+fi
+
 echo ""
 echo "Diisi: $diisi | Siap: $siap | Lewat: $dilewati | Gagal: $gagal"
 if [ "$siap" -gt 0 ] && [ "$diisi" -eq 0 ] && [ "$dry_run" -eq 0 ]; then

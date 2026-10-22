@@ -319,6 +319,158 @@ describe("stamen: mengenali pohon yang sudah pernah diisi", () => {
   });
 });
 
+describe("berbagi blok di node_modules root (--akar)", () => {
+  // Root hub bukan pohon yang setara dengan donor: kunci lockfile-nya berbeda
+  // (terukur fcd67c04 vs 2cb6e7db di repo ini), jadi satu-satunya yang aman
+  // dikerjakan adalah paket tingkat-satu yang isinya identik. Blok ini menjaga
+  // KEPUTUSAN itu: mana yang boleh ditukar, mana yang tidak boleh disentuh,
+  // dan bahwa menjalankan dua kali tidak mengubah apa pun.
+  //
+  // Perhatian: "02-kosong" akan diisi ulang oleh perulangan modul setiap kali
+  // skrip jalan, jadi pohon akar peraga dibangun di "09-akar" -- modul yang
+  // tidak pernah disentuh perulangan itu.
+  const donor = join(fixture, "01-donor", "node_modules");
+  const akar = join(fixture, "node_modules");
+  const jalanAkar = (extra = []) =>
+    jalankan(["--akar", ...extra], { PREFIX_DIR: "node_modules" });
+  const penanda = (paket) => join(akar, paket, ".dedup-shared");
+
+  beforeAll(() => {
+    rmSync(fixture, { recursive: true, force: true });
+    mkdirSync(fixture, { recursive: true });
+    bikinModul("01-donor", sama, true);
+    bikinModul("09-akar", sama);
+    // bikinModul hanya membuat react/vite; paket scoped harus ditambahkan sendiri
+    // supaya jalur "dua tingkat" di peta_bandup benar-benar teruji, bukan cuma disebut.
+    mkdirSync(join(donor, "@scope", "util"), { recursive: true });
+    writeFileSync(
+      join(donor, "@scope", "util", "package.json"),
+      '{"name":"@scope/util"}'
+    );
+    // root punya salinan identik untuk `react` dan `@scope/util`
+    for (const [paket, isi] of [
+      ["react", '{"name":"react","version":"19.3.1"}'],
+      ["@scope/util", '{"name":"@scope/util"}'],
+    ]) {
+      mkdirSync(join(akar, paket), { recursive: true });
+      writeFileSync(join(akar, paket, "package.json"), isi);
+    }
+    // `vite` sengaja TIDAK ada di akar -> hanya ada di donor
+    // `.bin` dan `.vite` ada di dua sisi dan harus tidak pernah disentuh
+    mkdirSync(join(akar, ".bin"), { recursive: true });
+    writeFileSync(join(akar, ".bin", "vite"), "#!/bin/sh\n");
+    mkdirSync(join(akar, ".vite", "deps"), { recursive: true });
+    writeFileSync(join(akar, ".vite", "deps", "cache.js"), "// cache\n");
+    // `eksklusif-root` cuma ada di akar: tidak boleh disentuh sama sekali
+    mkdirSync(join(akar, "eksklusif-root"), { recursive: true });
+    writeFileSync(join(akar, "eksklusif-root", "package.json"), '{"name":"x"}');
+  });
+
+  it("tidak aktif tanpa --akar (perilaku lama tidak berubah)", () => {
+    const hasil = jalankan();
+    expect(hasil.status).toBe(0);
+    expect(hasil.stdout).not.toMatch(/AKAR/);
+    expect(existsSync(penanda("react"))).toBe(false);
+  });
+
+  it("--dry-run hanya melaporkan, tidak menyentuh pohon akar", () => {
+    const hasil = jalanAkar(["--dry-run"]);
+    expect(hasil.status).toBe(0);
+    expect(hasil.stdout).toMatch(
+      /RENCANA akar -- bagikan node_modules\/react /
+    );
+    expect(hasil.stdout).toMatch(
+      /RENCANA akar -- bagikan node_modules\/@scope\/util /
+    );
+    expect(hasil.stdout).toMatch(/2 paket identik akan berbagi/);
+    expect(hasil.stdout).toMatch(/1 belum ada di root/);
+    expect(existsSync(penanda("react"))).toBe(false);
+  });
+
+  it("paket yang isinya identik ditandai berbagi, termasuk yang scoped", () => {
+    const hasil = jalanAkar();
+    expect(hasil.status).toBe(0);
+    expect(hasil.stdout).toMatch(
+      /2 paket sekarang berbagi blok dengan 01-donor/
+    );
+    expect(existsSync(penanda("react"))).toBe(true);
+    expect(existsSync(penanda("@scope/util"))).toBe(true);
+    // isi tetap sama seperti donor
+    expect(readFileSync(join(akar, "react", "package.json"), "utf8")).toBe(
+      readFileSync(join(donor, "react", "package.json"), "utf8")
+    );
+  });
+
+  it(".bin dan .vite di akar tidak pernah ikut dibagi", () => {
+    expect(existsSync(join(akar, ".bin", ".dedup-shared"))).toBe(false);
+    expect(existsSync(join(akar, ".vite", ".dedup-shared"))).toBe(false);
+    expect(existsSync(join(akar, ".vite", "deps", "cache.js"))).toBe(true);
+  });
+
+  it("paket yang hanya ada di akar dibiarkan apa adanya", () => {
+    const isi = readFileSync(
+      join(akar, "eksklusif-root", "package.json"),
+      "utf8"
+    );
+    expect(isi).toBe('{"name":"x"}');
+    expect(existsSync(penanda("eksklusif-root"))).toBe(false);
+  });
+
+  it("paket akar yang isinya berbeda dilaporkan BEDA dan tambalan bertahan", () => {
+    mkdirSync(join(donor, "hanya-donor"), { recursive: true });
+    writeFileSync(
+      join(donor, "hanya-donor", "package.json"),
+      '{"name":"react"}'
+    );
+    mkdirSync(join(akar, "hanya-donor"), { recursive: true });
+    writeFileSync(
+      join(akar, "hanya-donor", "package.json"),
+      '{"name":"react","lok":"saya"}'
+    );
+    const hasil = jalanAkar();
+    expect(hasil.stdout).toMatch(/BEDA\s+node_modules\/hanya-donor/);
+    expect(
+      readFileSync(join(akar, "hanya-donor", "package.json"), "utf8")
+    ).toMatch("saya");
+    rmSync(join(donor, "hanya-donor"), { recursive: true, force: true });
+    rmSync(join(akar, "hanya-donor"), { recursive: true, force: true });
+  });
+
+  it("--force atas BEDA akar memang menimpa dengan salinan donor", () => {
+    mkdirSync(join(donor, "hanya-donor"), { recursive: true });
+    writeFileSync(
+      join(donor, "hanya-donor", "package.json"),
+      '{"name":"react"}'
+    );
+    mkdirSync(join(akar, "hanya-donor"), { recursive: true });
+    writeFileSync(
+      join(akar, "hanya-donor", "package.json"),
+      '{"name":"react","lok":"saya"}'
+    );
+    const hasil = jalanAkar(["--force"]);
+    expect(hasil.stdout).toMatch(/1 paket sekarang berbagi blok/);
+    expect(
+      readFileSync(join(akar, "hanya-donor", "package.json"), "utf8")
+    ).not.toMatch("saya");
+    rmSync(join(donor, "hanya-donor"), { recursive: true, force: true });
+    rmSync(join(akar, "hanya-donor"), { recursive: true, force: true });
+  });
+
+  it("menjalankan lagi tidak mengerjakan apa pun (idempoten)", () => {
+    const hasil = jalanAkar();
+    expect(hasil.stdout).toMatch(/0 paket sekarang berbagi blok/);
+    expect(hasil.stdout).toMatch(/2 sudah berbagi dari sebelumnya/);
+    expect(hasil.stdout).toMatch(/0 BEDA tidak disentuh/);
+  });
+
+  it("tidak meninggalkan berkas sementara di pohon akar", () => {
+    expect(jalankanSisa()).toEqual([]);
+    expect(
+      readdirSync(akar).filter((n) => /\.(dedup-tmp|lama-tmp)$/.test(n))
+    ).toEqual([]);
+  });
+});
+
 describe("data repo yang sebenarnya", () => {
   // Run hanya kalau ada folder modul yang sudah di-install di mesin ini.
   // Di runner CI (job hub) folder modul kosong, dan skrip memang seharusnya
@@ -534,6 +686,12 @@ function jalankanSisa() {
     "-o",
     "-name",
     ".dedup-probe.*",
+    "-o",
+    "-name",
+    "*.dedup-tmp",
+    "-o",
+    "-name",
+    "*.lama-tmp",
     "-print",
   ]);
 }
