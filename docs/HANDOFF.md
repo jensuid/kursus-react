@@ -171,11 +171,11 @@ Empat job:
 | `modul` | sama seperti `hub`, jalan setelah `isi-matriks` | **satu job per folder modul 01-10** (Node 22): `npm ci` dengan lockfile folder itu sendiri → `vite build` → periksa `dist/assets/*.css` benar-benar memuat gaya dasar dari `styles/base.css` |
 | `probe` | dispatch dengan isian `node_version` | satu versi Node bebas, untuk menguji klaim dukungan. Semua pemeriksaan (`npm ci`, lint, format, **test**, build) jalan tanpa berhenti dini; hasilnya jadi tabel di Run Summary. `continue-on-error: true` di level job karena hasilnya informasi, bukan gerbang |
 
-Angka bawah matriks (`22`) berasal dari `engines` paket yang terpasang, bukan dugaan: vitest 5 `^22.12.0 \|\| ^24.0.0 \|\| >=26.0.0` dan jsdom 30 `^22.22.2 \|\| ^24.15.0 \|\| >=26.0.0`. Node 20 tadinya masuk matriks; ia keluar begitu langkah uji ditambahkan, karena yang diuji bukan lagi cuma aplikasi tapi juga tooling ujinya.
+Angka bawah matriks (`22`) bermula dari `engines` paket yang terpasang: vitest 5 `^22.12.0 \|\| ^24.0.0 \|\| >=26.0.0` dan jsdom 30 `^22.22.2 \|\| ^24.15.0 \|\| >=26.0.0`. Node 20 tadinya masuk matriks; ia keluar begitu langkah uji ditambahkan, karena yang diuji bukan lagi cuma aplikasi tapi juga tooling ujinya. Angka itu tidak berhenti sebagai pembacaan `engines` -- tabel probe A/B di bawah mengukurnya langsung.
 
 Cara memakai probe: `gh workflow run ci.yml --ref main -f node_version=18`, lalu baca `gh run view <id> --log` (baris `| ... | GAGAL |`) — jangan percaya status hijau job-nya. Probe juga meninggalkan annotation di halaman run (`[warning] \`npm run lint\` gagal pada Node 18`), yang bisa dibaca lewat `gh api repos/jensuid/kursus-react/check-runs/<job_id>/annotations`.
 
-Status terverifikasi pada **run terbaru `main`** (`e93d3a9`, run `39739605225`): **14 job = 13 hijau + 1 `probe` ter-*skip*** sesuai desain. Rinciannya, diambil dari log run, bukan dari harapan:
+Status terverifikasi pada **run terbaru `main`** (`e93d3a9`, run `39739605225`): **14 job = 13 hijau + 1 `probe` ter-*skip*** sesuai desain. Rinciannya, diambil dari log run, bukan dari harapan (kolom `Isi` di tabel di atas boleh dibaca sebagai hasil, bukan desain lagi):
 
 - `Hub (Node 22)` dan `Hub (Node 24)` lulus, masing-masing dengan langkah `Uji (Vitest)` yang benar-benar memeriksa: `Test Files 6 passed (6)` + `Tests 53 passed (53)` di kedua kaki.
 - `Ambil daftar folder modul` mengeluarkan `Matriks yang dipakai: ["01-hello-component",…,"10-final-project"]` -- sepuluh entri hasil baca disk.
@@ -194,7 +194,9 @@ Probe A/B yang menutup klaim batas versi uji (`node_version=20` lalu `node_versi
 Dua hal yang mengubah cara membaca tabel di atas:
 
 - Kegagalan di Node 20 **bukan** penolakan `engines` yang rapi, tapi crash di dalam undici. Vitest bahkan mencetak "This might cause false positive tests" -- dan memang begitu: `26 passed` itu nyata, tapi cuma separuh dari suite. Jadi angka "passes" pada versi di luar dukungan tidak bisa dibaca sebagai "sisanya aman".
-- Job probe `continue-on-error`, sehingga run Node 20 tetap **berwarna hijau** walau `npm run test` GAGAL. Kesimpulan batas versi harus dibaca dari baris tabel di log (`| npm run test | GAGAL |`), bukan dari status run -- sama seperti peringatan di bullet terakhir bagian ini.
+- Job probe `continue-on-error`, sehingga run Node 20 tetap **berwarna hijau** walau `npm run test` GAGAL. Kesimpulan batas versi harus dibaca dari baris tabel di log (`| npm run test | GAGAL |`), bukan dari status run -- ini pengulangan peringatan di bullet `continue-on-error` beberapa baris di bawah, karena kesalahan membacanya hampir terulang dua kali.
+
+Bentuk ini tidak rapuh: push dokumen saja berikutnya (`ebfcb97`, run `39742007767`) menghasilkan 14 job yang sama dengan hasil sama (13 lulus, `probe` ter-*skip*). Kalau nanti berubah merah tanpa ada yang menyentuh CI, curiga pada image runner atau dependensi lebih dulu, bukan pada struktur file ini.
 
 Perubahan yang lahir dari menemukan warning CI, bukan dari niat awal:
 
