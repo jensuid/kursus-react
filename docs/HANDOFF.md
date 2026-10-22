@@ -157,7 +157,14 @@ Dua job:
 | `hub` | push ke `main`, tiap PR, dispatch tanpa isian | matriks Node **20 / 22 / 24** × (`npm ci` → `lint` → `format:check` → jalankan script Modul 00 → `build`) |
 | `probe` | dispatch dengan isian `node_version` | satu versi Node bebas, untuk menguji klaim dukungan. Semua pemeriksaan jalan tanpa berhenti dini; hasilnya jadi tabel di Run Summary. `continue-on-error: true` di level job karena hasilnya informasi, bukan gerbang |
 
-Cara memakai probe: `gh workflow run ci.yml --ref main -f node_version=18`, lalu baca `gh run view <id> --log` (baris `| ... | GAGAL |`) — jangan percaya status hijau job-nya.
+Cara memakai probe: `gh workflow run ci.yml --ref main -f node_version=18`, lalu baca `gh run view <id> --log` (baris `| ... | GAGAL |`) — jangan percaya status hijau job-nya. Probe juga meninggalkan annotation di halaman run (`[warning] \`npm run lint\` gagal pada Node 18`), yang bisa dibaca lewat `gh api repos/jensuid/kursus-react/check-runs/<job_id>/annotations`.
+
+Status terverifikasi (run pertama di `main`): ketiga kaki matriks **lulus** — `Hub (Node 20/22/24)`, `79 modules transformed` pada masing-masing, `OK: 10 script Modul 00 berjalan tanpa error`, job `probe` ter-*skip* sesuai desain. Annotation lint di run hijau berisi 11 warning `no-unused-vars` Modul 00 — persis seperti yang didokumentasikan di §3.4, bukti bahwa lint benar-benar dieksekusi di CI dan tidak hanya lulus karena tidak ada yang diperiksa.
+
+Perubahan yang lahir dari menemukan warning CI, bukan dari niat awal:
+
+- `actions/checkout` dan `actions/setup-node` dinaikkan **v4 → v7**. CI memuntahkan warning bahwa keduanya menargetkan Node 20 dan dipaksa jalan di Node 24. Setelah kenaikan, warning hilang dan matriks tetap hijau (diverifikasi ulang lewat API annotation).
+- **Yang perlu diawasi:** ada notice bahwa label `ubuntu-latest` bermigrasi ke Ubuntu 26 mulai 19 Okt 2026. Sengaja tidak meng-*pin* image secara eksplisit — mengikuti `latest` lebih murah perawatan untuk proyek kecil, dan job ini tidak bergantung pada tool sistem khusus. Kalau CI tiba-tiba merah tanpa perubahan kode, cek ini lebih dulu.
 
 Poin yang tidak terlihat dari sekilas baca:
 
