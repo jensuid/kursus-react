@@ -2,7 +2,7 @@
 
 > **Untuk:** developer/pengajar yang melanjutkan proyek ini
 > **Lokasi:** `/Volumes/JensData/Jensu-Projects/frontend-basic/react-ui`
-> **Status:** Fitur lengkap & terverifikasi. Siap dilanjutkan.
+> **Status:** Fitur lengkap & terverifikasi. **Sudah masuk version control** (branch `main`, commit awal `772d5c7`). Siap dilanjutkan.
 > **Baca pertama:** bagian [Mulai Cepat](#mulai-cepat) lalu [Hutang Teknis](#hutang-teknis--kendala-yang-diketahui).
 
 ---
@@ -195,21 +195,22 @@ npm run dev
 
 ## 7. Hutang Teknis & Kendala yang Diketahui
 
-Ditulis jujur apa adanya — ini yang pertama kali perlu dibereskan.
+Ditulis jujur apa adanya. **H1 dan H2 sudah dibereskan** (lihat kolom Status);
+sisanya masih terbuka.
 
-| # | Temuan | Dampak | Saran penanganan |
-|---|---|---|---|
-| H1 | **Belum ada repository Git.** `git status` → `fatal: not a git repository` | Tidak ada riwayat perubahan, tidak bisa collab/CI/deploy | `git init && git add -A && git commit -m "init: kursus react + hub"`. `.gitignore` sudah siap (node_modules, dist, .vite, .DS_Store) |
-| H2 | **10 folder `dist/` basi** dari build verifikasi lama (`01-hello-component/dist`, dst.) | Artefak usang, bikin bingung & boros disk | `find . -maxdepth 2 -name dist -type d -exec rm -rf {} +` |
-| H3 | **Duplikasi `node_modules` per modul** (±11 salinan, >500 MB) | Clone/install berat | *Opsi A:* jadikan **workspace monorepo** (`npm workspaces` di root) supaya 1 `node_modules`. *Catatan:* mengubah model "modul mandiri", jadi putuskan sadar |
-| H4 | **Base styles diduplikasi**: `src/hub.css` menyalin isi `styles.css` tiap modul | Ubah gaya global → harus ubah di 11 tempat | Ekstrak `styles.css` ke satu file bersama (mis. `shared/base.css`) yang di-`@import` modul & hub. Perlu sedikit refactor jalur import |
-| H5 | **Modul 00 tidak bisa dijalankan dari hub** (butuh Node) | Pembelajar harus buka terminal | Opsional: tambah panel "output" yang menjalankan skrip lewat Web Worker/`new Function`, **tapi** hati-hati: `import/export` antar-file tidak jalan tanpa bundler. Nilai edukatif model saat ini justru "ES6 murni = jalan di Node" |
-| H6 | **Markdown 11 dirender mentah** di `<pre>`, bukan HTML | Kurang nyaman dibaca, heading/code block polos | Tambah renderer ringan (`marked`/`react-markdown`) **hanya di hub** agar modul tetap bebas dependensi |
-| H7 | **Tombol "Salin" butuh secure context** (`navigator.clipboard`) | Gagal diam-diam saat diakses via HTTP non-localhost/jaringan | Sudah ada `try/catch`, tapi beri fallback `document.execCommand('copy')` atau tampilkan teks saja |
-| H8 | **Tidak ada ESLint/Prettier/testing/CI** | Regresi tak terdeteksi otomatis | Tambah ESLint (wajib: `react-hooks` agar aturan hooks ditegakkan) + Prettier + 1 workflow CI (`npm run build`). Untuk uji: Vitest + React Testing Library |
-| H9 | `docs/panduan.md` **kosong (0 byte)** | Membingungkan, tampak seperti file rusak | Isi atau hapus. `docs/plan.md` = snapshot rencana awal (dipertahankan sebagai arsip) |
-| H10 | **Tidak ada `README` untuk hub itu sendiri** di `src/` | Arsitektur hub hanya terdokumentasi di sini | Pertimbangkan `src/README.md` singkat |
-| H11 | Port dev **5173** dipakai hub; modul mandiri juga 5173 | Tidak bisa menjalankan hub + modul bersamaan tanpa berebut port | Jalankan salah satu, atau `npm run dev -- --port 5180` |
+| # | Status | Temuan | Dampak | Saran penanganan |
+|---|---|---|---|---|
+| H1 | ✅ **Beres** | Dahulu: tidak ada repository Git | — | Sekarang repo aktif di branch **`main`**, commit awal `772d5c7` (121 file), `git status` bersih. `.gitignore` terbukti mengabaikan `node_modules/` & `dist/`. **Belum ada remote** — tambahkan dengan `git remote add origin <url> && git push -u origin main` |
+| H2 | ✅ **Beres** | Dahulu: 10 folder `dist/` basi dari build verifikasi lama | — | Sudah dihapus semuanya; 10 folder `src/` modul tetap utuh. Build berikutnya menghasilkan `dist/` baru yang memang boleh diabaikan git |
+| H3 | ⬜ Terbuka | **Duplikasi `node_modules` per modul** (±11 salinan, >500 MB) | Clone/install berat | *Opsi A:* jadikan **workspace monorepo** (`npm workspaces` di root) supaya 1 `node_modules`. *Catatan:* mengubah model "modul mandiri", jadi putuskan sadar |
+| H4 | ⬜ Terbuka | **Base styles diduplikasi**: `src/hub.css` menyalin isi `styles.css` tiap modul | Ubah gaya global → harus ubah di 11 tempat | Ekstrak `styles.css` ke satu file bersama (mis. `shared/base.css`) yang di-`@import` modul & hub. Perlu sedikit refactor jalur import |
+| H5 | ⬜ Terbuka | **Modul 00 tidak bisa dijalankan dari hub** (butuh Node) | Pembelajar harus buka terminal | Opsional: tambah panel "output" yang menjalankan skrip lewat Web Worker/`new Function`, **tapi** hati-hati: `import/export` antar-file tidak jalan tanpa bundler. Nilai edukatif model saat ini justru "ES6 murni = jalan di Node" |
+| H6 | ⬜ Terbuka | **Markdown 11 dirender mentah** di `<pre>`, bukan HTML | Kurang nyaman dibaca, heading/code block polos | Tambah renderer ringan (`marked`/`react-markdown`) **hanya di hub** agar modul tetap bebas dependensi |
+| H7 | ⬜ Terbuka | **Tombol "Salin" butuh secure context** (`navigator.clipboard`) | Gagal diam-diam saat diakses via HTTP non-localhost/jaringan | Sudah ada `try/catch`, tapi beri fallback `document.execCommand('copy')` atau tampilkan teks saja |
+| H8 | ⬜ Terbuka | **Tidak ada ESLint/Prettier/testing/CI** | Regresi tak terdeteksi otomatis | Tambah ESLint (wajib: `react-hooks` agar aturan hooks ditegakkan) + Prettier + 1 workflow CI (`npm run build`). Untuk uji: Vitest + React Testing Library |
+| H9 | ⬜ Terbuka | `docs/panduan.md` **kosong (0 byte)** | Membingungkan, tampak seperti file rusak | Isi atau hapus. `docs/plan.md` = snapshot rencana awal (dipertahankan sebagai arsip) |
+| H10 | ⬜ Terbuka | **Tidak ada `README` untuk hub itu sendiri** di `src/` | Arsitektur hub hanya terdokumentasi di sini | Pertimbangkan `src/README.md` singkat |
+| H11 | ⬜ Terbuka | Port dev **5173** dipakai hub; modul mandiri juga 5173 | Tidak bisa menjalankan hub + modul bersamaan tanpa berebut port | Jalankan salah satu, atau `npm run dev -- --port 5180` |
 
 ---
 
@@ -219,7 +220,8 @@ Diurutkan dari rasio nilai/tenaga tertinggi.
 
 ### near — selesai dalam hitungan jam
 
-- [ ] **Bereskan H1 + H2**: `git init` + commit awal, hapus `dist/` basi. Fondasi semua pekerjaan lain.
+- [x] ~~**Bereskan H1 + H2**~~ — **selesai**: repo Git di branch `main`, commit awal `772d5c7`, 10 folder `dist/` basi dihapus.
+- [ ] **Tambah remote + push** (`git remote add origin <url> && git push -u origin main`) — prasyarat CI & deploy.
 - [ ] **Bereskan H9**: hapus/isi `docs/panduan.md`.
 - [ ] **ESLint + Prettier (H8)**: termasuk `eslint-plugin-react-hooks` — sekaligus alat bantu belajar "aturan hooks" (Modul 08).
 - [ ] **CI sederhana**: workflow `npm ci && npm run build` di root.
@@ -304,4 +306,4 @@ Urutan kurikulum dan konsep yang ditanam — berguna kalau mau menambah modul ag
 
 ## 13. Ringkasan Satu Paragraf
 
-Proyek ini adalah kursus React 12 modul berbahasa Indonesia yang berjalan di dua mode: hub terpadu di root (Vite + React 19 + React Router 7, semua demo 01-10 dimuat via `React.lazy`, modul 00/11 dibaca via `?raw`) dan modul mandiri per folder. Semua sudah terverifikasi lewat build dan browser dengan 0 error. Yang paling menghambat pengembangan berikutnya bukan fitur, tapi fondasi rekayasa: **belum ada Git**, artefak `dist/` usang belum dibersihkan, belum ada lint/CI, dan ada duplikasi kecil (base CSS, `node_modules`). Selesaikan §8 bagian *near*, sisanya tinggal berkembang.
+Proyek ini adalah kursus React 12 modul berbahasa Indonesia yang berjalan di dua mode: hub terpadu di root (Vite + React 19 + React Router 7, semua demo 01-10 dimuat via `React.lazy`, modul 00/11 dibaca via `?raw`) dan modul mandiri per folder. Semua sudah terverifikasi lewat build dan browser dengan 0 error, dan kini sudah berada di repository Git (branch `main`, commit awal `772d5c7`) setelah artefak `dist/` usang dibersihkan. Yang paling menghambat pengembangan berikutnya bukan fitur, tapi fondasi rekayasa yang tersisa: **belum ada remote/CI/lint**, artefak duplikat (base CSS, `node_modules` per modul), dan markdown hub yang masih dirender mentah. Mulai dari backlog *near* di §8.
