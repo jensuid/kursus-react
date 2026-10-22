@@ -203,6 +203,122 @@ describe("penjaga lockfile dan pohon yang sudah ada", () => {
   });
 });
 
+describe("stamen: mengenali pohon yang sudah pernah diisi", () => {
+  // Tanpa stamen, menjalankan perkakas ini untuk kedua kalinya buta: satu-satunya
+  // jalan adalah --force, yang mengganti SEMUA pohon dan membuang perubahan lokal
+  // tanpa peringatan. Blok ini menguji bahwa keputusan itu sekarang diambil dari
+  // bukti di disk -- dan bahwa bukti itu tidak bisa berbohong halus.
+  //
+  // Jalur ini diuji lewat jalankan() (selalu bawa --copy) supaya jalan di
+  // filesystem mana pun: yang diuji di sini adalah KEPUTUSAN kelas pohon, bukan
+  // mekanika klonnya.
+  const pohon = join(fixture, "02-kosong", "node_modules");
+  const isiStamen = () => readFileSync(join(pohon, ".dedup-stamp"), "utf8");
+
+  beforeAll(() => {
+    rmSync(fixture, { recursive: true, force: true });
+    mkdirSync(fixture, { recursive: true });
+    bikinModul("01-donor", sama, true);
+    bikinModul("02-kosong", sama);
+  });
+
+  it("--dry-run tidak menulis stamen di folder yang belum diisi", () => {
+    const hasil = jalankan(["--dry-run"]);
+    expect(hasil.status).toBe(0);
+    expect(hasil.stdout).toMatch(/RENCANA 02-kosong/);
+    expect(existsSync(pohon)).toBe(false);
+  });
+
+  it("pengisian menulis stamen yang menyebut donor, mekanika, dan sidik", () => {
+    const hasil = jalankan();
+    expect(hasil.status).toBe(0);
+    expect(hasil.stdout).toMatch(/ISI\s+02-kosong/);
+    const isi = isiStamen();
+    expect(isi).toMatch(/^dedup-stamp-v1$/m);
+    expect(isi).toMatch(/^donor=01-donor$/m);
+    expect(isi).toMatch(/^mekanika=(clone|salin)$/m);
+    expect(isi).toMatch(/^sidik=[0-9a-f]{32}$/m);
+    expect(isi).toMatch(/^lockfile=[0-9a-f]{32}$/m);
+    // Penanganan subshell: `sidik_donor=$(sidik_donor_kini)` dulu menyidik donor di
+    // child process, jadi barisnya tidak pernah sampai ke shell induk dan `berkas=`
+    // tertulis kosong -- tanpa uji ini gejalanya cuma satu angka yang hilang.
+    expect(isi).toMatch(/^berkas=[1-9][0-9]*$/m);
+  });
+
+  it("pohon hasil isian dilaporkan SIAP dan tidak disentuh lagi", () => {
+    const hasil = jalankan();
+    expect(hasil.stdout).toMatch(/SIAP\s+02-kosong/);
+    expect(hasil.stdout).not.toMatch(/RENCANA/);
+    expect(hasil.stdout).toMatch(/Diisi: 0 \| Siap: 1 \| Lewat: 0 \| Gagal: 0/);
+  });
+
+  it("cache .vite yang dibuat ulang bukan penyimpangan", () => {
+    // Vite menulis node_modules/.vite tiap kali dev server jalan. Kalau itu
+    // dihitung, setiap pembelajar yang menjalankan `npm run dev` akan melihat
+    // klonnya "basi" -- dan godaan selanjutnya adalah --force.
+    mkdirSync(join(pohon, ".vite", "deps"), { recursive: true });
+    writeFileSync(
+      join(pohon, ".vite", "deps", "_metadata.json"),
+      JSON.stringify({ root: join(fixture, "02-kosong") })
+    );
+    const hasil = jalankan();
+    expect(hasil.stdout).toMatch(/SIAP\s+02-kosong/);
+  });
+
+  it("perubahan di dalam pohon dilaporkan BEDA, dan tidak dihapus", () => {
+    writeFileSync(
+      join(pohon, "tambalan-debug.txt"),
+      "diubah manual di node_modules"
+    );
+    const hasil = jalankan();
+    expect(hasil.stdout).toMatch(/BEDA\s+02-kosong/);
+    expect(hasil.stdout).toMatch(/berubah sejak diisi/);
+    expect(existsSync(join(pohon, "tambalan-debug.txt"))).toBe(true);
+  });
+
+  it("--force mengisi ulang dan membuang tambalan lokal", () => {
+    const hasil = jalankan(["--force"]);
+    expect(hasil.status).toBe(0);
+    expect(hasil.stdout).toMatch(/ISI\s+02-kosong/);
+    expect(existsSync(join(pohon, "tambalan-debug.txt"))).toBe(false);
+    // Sidik di stamen sengaja TIDAK berubah: yang dicatat adalah sidik pohon donor,
+    // dan donor tidak ikut diutak-atik. Buktinya justru pohonnya sendiri yang
+    // kembali setara, yaitu laporan SIAP di bawah.
+    expect(jalankan().stdout).toMatch(/SIAP\s+02-kosong/);
+  });
+
+  it("stamen yang tidak dikenali diperlakukan seperti pohon install sendiri", () => {
+    writeFileSync(join(pohon, ".dedup-stamp"), "bukan stamen versi 1\n");
+    const hasil = jalankan();
+    // Tidak ada klaim palsu: skrip tidak boleh bilang SIAP/BEDA dari berkas yang
+    // tidak bisa dibacanya, dan juga tidak boleh menghapus pohonnya.
+    expect(hasil.stdout).toMatch(/LEWAT\s+02-kosong/);
+    expect(hasil.stdout).not.toMatch(/SIAP|BEDA/);
+    expect(existsSync(join(pohon, "react", "package.json"))).toBe(true);
+    jalankan(["--force"]); // pulihkan supaya uji berikutnya mulai dari pohon bersih
+  });
+
+  it("donor yang berubah membuat klon-nya dilaporkan BEDA (lalu pulih sendiri)", () => {
+    expect(jalankan().stdout).toMatch(/SIAP\s+02-kosong/);
+    writeFileSync(
+      join(fixture, "01-donor", "node_modules", "tambahan-donor.txt"),
+      "npm install di donor"
+    );
+    const hasil = jalankan();
+    // Sidik pohon ini masih sama, lockfile masih sama -- yang berubah pohon donor.
+    expect(hasil.stdout).toMatch(/BEDA\s+02-kosong/);
+    expect(hasil.stdout).toMatch(/donor 01-donor berubah/);
+    rmSync(join(fixture, "01-donor", "node_modules", "tambahan-donor.txt"), {
+      force: true,
+    });
+    expect(jalankan().stdout).toMatch(/SIAP\s+02-kosong/);
+  });
+
+  it("stamen tidak meninggalkan berkas sementara", () => {
+    expect(jalankanSisa()).toEqual([]);
+  });
+});
+
 describe("data repo yang sebenarnya", () => {
   // Run hanya kalau ada folder modul yang sudah di-install di mesin ini.
   // Di runner CI (job hub) folder modul kosong, dan skrip memang seharusnya
