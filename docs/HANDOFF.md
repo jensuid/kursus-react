@@ -235,7 +235,11 @@ membawa `--copy` lewat `jalankan()`. Sembilan uji blok itu karenanya cuma hijau
 di APFS. Perbaikannya dua bagian (lintasan root tetap
 jalan dengan mekanika salinan + kata ringkasan yang jujur per mekanika) dan
 kontrol negatif yang membuktikan penjaga barunya bisa gagal tercatat di §4. Run
-perbaikannya menyusul, dan nomornya dicatat di §6.
+perbaikannya (`3ee61bf`, run `39800172722`) hijau: **14 job, 0 gagal**, kedua kaki
+`hub` melaporkan `Test Files 7 passed (7)` + `Tests 86 passed | 5 skipped (91)`
+dengan `tests/dedup-modules.test.js (38 tests | 5 skipped)` — artinya **33 penjaga
+keputusan jalan di ext4**, termasuk sepuluh keputusan `--akar` dan uji `cp` palsu
+yang baru; yang di-*skip* tetap hanya mekanika klon + uji "repo sebenarnya".
 
 > Cara membaca hasil run ini juga mengecoh dan perlu dicatat: `gh run view
 > --json status,conclusion` melaporkan `completed`/`failure` sementara 12 dari 13
@@ -243,7 +247,12 @@ perbaikannya menyusul, dan nomornya dicatat di §6.
 > Jangan simpulkan "runner rusak" dari sana — ambil `--log-failed`; di situlah
 > `##[error]AssertionError …` muncul dengan `+ Received` lengkap. `annotations`
 > juga mengembalikan 404 untuk run ini, jadi itu bukan jalan masuk yang bisa
-> diandalkan.
+> diandalkan. Sisi satunya juga perlu dicatat karena mengecoh dengan cara
+> terbalik: pada run hijau `39800172722`, `gh run view --json conclusion` sudah
+> melaporkan `success` dan `watch --exit-status` sudah keluar sejak awal, sementara
+> sembilan job masih berstatus `queued` di API jobs — angka `Tests` per kaki baru
+> terbaca beberapa menit kemudian lewat `--log` (dan escape ANSI-nya hanya
+> hilang dengan `perl -pe 's/\e\[[0-9;]*m//g'`, `sed` biasa tidak cukup).
 
 Perubahan yang lahir dari menemukan warning CI, bukan dari niat awal:
 
@@ -722,7 +731,7 @@ Diverifikasi pada kondisi saat ini (dev server + browser headless + uji otomatis
 | Uji otomatis | `npm run test` | ✅ **91 uji pada 7 berkas**; penjaga uji pernah dibuktikan bisa gagal lewat mutasi (§3.6, termasuk tiga mutasi untuk blok `--akar`). Angka **53** yang muncul di §3.5 adalah hasil run CI pada commit sebelum berkas uji dedup ada — bukan angka yang salah |
 | CI bentuk sekarang | `gh run view 39739605225 --json jobs` | ✅ **14 job: 13 lulus + `probe` ter-*skip*** — dua kaki `hub` (Node 22/24) dengan langkah uji, `isi-matriks` menghasilkan 10 folder dari disk, 10 job `Build <modul>` lulus dengan CSS 666-2173 byte |
 | Batas versi uji | job probe A/B (`node_version=20` vs `22`) | ✅ Node 20.20.2: `npm run test` **GAGAL** (26 uji node-only lulus, 4 berkas DOM mati); Node 22.23.3: **53 lulus**. Rinciannya di §3.5 |
-| Perkakas hemat disk (H3) | `npm run setup:shared -- --dry-run --force`, `npm run setup:shared -- --akar`, `df -k`, build & dev folder hasil klon | ✅ Rencana 9 folder terbaca benar; eksekusi `--force` → `Diisi: 9 \| Lewat: 0 \| Gagal: 0`, ruang tersedia volume naik **412.884 KB** (§4). `05-forms`/`10-final-project` tetap bisa `build` + dev dari pohon klon. Lintasan **`--akar`** terukur melepas **32.928 KB** lagi (64 paket root, 49.459.766 byte logis) dan run keduanya `0 paket \| 64 sudah berbagi \| 0 BEDA`. 38 uji perilaku menutup jalur non-reflink (direkam dengan `cp` palsu), tiga keputusan stamen (`SIAP`/`BEDA`/`LEWAT`, lihat §4), dan sepuluh keputusan `--akar`. Yang sudah terbukti di CI (ext4, run `39767564475`): `76 passed \| 5 skipped (81)` per kaki hub, `dedup-modules.test.js (28 tests \| 5 skipped)` — yang di-skip cuma mekanika klon; keputusan tetap jalan di ext4 (rinciannya §3.5). Blok `--akar` sendiri sudah punya riwayat CI dan tidak bersih: `e4ce457` memberi **merah yang ketiga** (run `39795900782`, dua kaki `hub`) karena lintasan root menolak jalan tanpa reflink sementara ujiannya selalu membawa `--copy` — hijau di APFS, MERAH di ext4 (gejala & perbaikannya di §3.5). Perbaikan yang membuatnya teruji di dua filesystem itu menambah uji ke-10 (`cp` palsu); nomor run hijau untuk perbaikan ini dicatat menyusul begitu push selesai. |
+| Perkakas hemat disk (H3) | `npm run setup:shared -- --dry-run --force`, `npm run setup:shared -- --akar`, `df -k`, build & dev folder hasil klon | ✅ Rencana 9 folder terbaca benar; eksekusi `--force` → `Diisi: 9 \| Lewat: 0 \| Gagal: 0`, ruang tersedia volume naik **412.884 KB** (§4). `05-forms`/`10-final-project` tetap bisa `build` + dev dari pohon klon. Lintasan **`--akar`** terukur melepas **32.928 KB** lagi (64 paket root, 49.459.766 byte logis) dan run keduanya `0 paket \| 64 sudah berbagi \| 0 BEDA`. 38 uji perilaku menutup jalur non-reflink (direkam dengan `cp` palsu), tiga keputusan stamen (`SIAP`/`BEDA`/`LEWAT`, lihat §4), dan sepuluh keputusan `--akar`. Yang sudah terbukti di CI (ext4, run `39767564475`): `76 passed \| 5 skipped (81)` per kaki hub, `dedup-modules.test.js (28 tests \| 5 skipped)` — yang di-skip cuma mekanika klon; keputusan tetap jalan di ext4 (rinciannya §3.5). Blok `--akar` sendiri sudah punya riwayat CI dan tidak bersih: `e4ce457` memberi **merah yang ketiga** (run `39795900782`, dua kaki `hub`) karena lintasan root menolak jalan tanpa reflink sementara ujiannya selalu membawa `--copy` — hijau di APFS, MERAH di ext4 (gejala & perbaikannya di §3.5). Perbaikan yang membuatnya teruji di dua filesystem itu menambah uji ke-10 (`cp` palsu) dan **sudah hijau di CI**: `3ee61bf`, run `39800172722` — 14 job, 0 gagal, `86 passed \| 5 skipped (91)` per kaki hub dengan `dedup-modules.test.js (38 tests \| 5 skipped)`; yang di-skip tetap mekanika klon + uji "repo sebenarnya", jadi 33 penjaga keputusan (sepuluh di antaranya `--akar`) sungguh dijalankan di ext4. |
 | Situs live (Vercel) | `curl` anonim + browser nyata di `https://kursus-react.vercel.app` | ✅ `/`, `/modul/05`, `/modul/10`, `/modul/11` semuanya **200 tanpa login**; hash bundle produksi (`index-DMrxvv-X.js`) identik dengan build lokal; CSS 5.118 byte berisi `system-ui`; interaksi Todo terukur di produksi (**3 → 4** item, ringkasan "1 dari 4"); **0 error console, 0 request 4xx/5xx**; deep link tidak 404 karena rewrite `vercel.json` (§3.7) |
 
 Perintah re-verifikasi cepat untuk pengembang berikutnya:
