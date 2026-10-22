@@ -1,19 +1,28 @@
-# CI — memeriksa hub di beberapa versi Node sekaligus.
+# CI — memeriksa hub + tiap modul di beberapa versi Node sekaligus.
 #
 # Keputusan yang perlu diketahui sebelum file ini diubah:
-#   * Matriks dimulai dari Node 20, BUKAN 18, walau README dulu menulis
-#     "Node >= 18". Alasannya dari `engines` dependensi yang terpasang:
-#       - react-router-dom 7.18.4 -> node >=20.0.0
-#       - eslint 10.13.0          -> node ^20.19.0 || ^22.13.0 || >=24
-#     Jadi Node 18 tidak didukung oleh hub, dan angka di README sudah
-#     disesuaikan (lihat docs/HANDOFF.md §4 dan §3.5).
-#   * CI ini hanya menyentuh root (hub) + script Modul 00 yang dijalankan
-#     dengan `node`. Folder 01-10 TIDAK di-build di sini — mereka punya
-#     lockfile sendiri dan hub meng-import App.jsx mereka sebagai file
-#     sumber biasa. Menutup celah itu = wacana "matrix 10 modul".
-#   * CI hanya sekuat pemeriksaan yang ada di dalamnya. `format:check` di
-#     sini tunduk pada .prettierignore, sehingga kerusakan *materi ajar*
-#     (mis. tabel perbandingan sintaks di Modul 01) tidak akan tertangkap.
+#   * Matriks dimulai dari Node 22. Angkanya bukan dugaan, tapi dari `engines`
+#     paket yang benar-benar terpasang:
+#       - eslint 10.13.0  -> ^20.19.0 || ^22.13.0 || >=24
+#       - vitest 5.0.5    -> ^22.12.0 || ^24.0.0 || >=26.0.0
+#       - jsdom 30.1.3    -> ^22.22.2 || ^24.15.0 || >=26.0.0
+#       - react-router-dom 7.18.4 -> >=20.0.0
+#     Bawahannya diukur sendiri lewat job `probe` (lihat docs/HANDOFF.md §3.5),
+#     bukan disimpulkan dari halaman dokumentasi.
+#   * CI ini memeriksa hub (lint + format + uji + build), seluruh script Modul 00
+#     yang dijalankan dengan `node`, dan -- lewat job `modul` -- tiap folder modul
+#     di-build berdiri sendiri dengan lockfile-nya sendiri.
+#   * Daftar folder modul TIDAK dituliskan di sini. Job `isi-matriks` mengambilnya
+#     dari isi disk, supaya folder baru tidak bisa lolos tanpa ikut diperiksa
+#     (matrix yang dihafal manual akan diam-diam melewatkan modul ke-11).
+#   * CI hanya sekuat pemeriksaan yang ada di dalamnya. `format:check` tunduk pada
+#     .prettierignore, sehingga kerusakan *materi ajar* (mis. tabel perbandingan
+#     sintaks di Modul 01) tidak tertangkap olehnya -- itu tugas tests/hygiene.test.js,
+#     yang ikut jalan di langkah Uji di bawah.
+#   * Build hub saja TIDAK cukup untuk memastikan modul berdiri sendiri masih bisa
+#     `npm run dev`: hub meng-import App.jsx mereka sebagai file sumber, dengan
+#     node_modules dan lockfile milik root. Karena itu job `modul` mengulang
+#     install + build di dalam folder masing-masing.
 name: CI
 
 on:
@@ -48,7 +57,7 @@ jobs:
       # *versi mana saja* yang bermasalah, bukan berhenti di yang pertama.
       fail-fast: false
       matrix:
-        node: ["20", "22", "24"]
+        node: ["22", "24"]
 
     steps:
       - uses: actions/checkout@v7
@@ -76,6 +85,12 @@ jobs:
       - name: Format check (khusus infra hub)
         run: npm run format:check
 
+      # Uji perilaku + penjaga materi ajar. Dijalankan di semua versi Node dalam
+      # matriks karena yang diuji bukan hanya aplikasi, tapi juga tooling uji
+      # (Vitest/jsdom punya tuntutan Node-nya sendiri).
+      - name: Uji (Vitest)
+        run: npm run test
+
       # Modul 00 adalah script Node murni: tidak ikut masuk `vite build`,
       # jadi tanpa langkah ini kerusakannya tidak akan pernah terlihat di CI.
       - name: Jalankan seluruh script Modul 00
@@ -94,6 +109,93 @@ jobs:
 
       - name: Build hub
         run: npm run build
+
+  isi-matriks:
+    # Satu langkah kecil yang mengubah daftar folder dari "dihafal" jadi
+    # "dibaca dari disk". Tanpa ini, seseorang yang menambah modul 12 harus
+    # ingat menyunting CI juga -- dan kalau lupa, CI tetap hijau sementara
+    # modul baru itu tidak pernah diperiksa di mana pun.
+    name: Ambil daftar folder modul
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.node_version == '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      modul: ${{ steps.daftar.outputs.modul }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Daftarkan folder yang berdiri sendiri
+        id: daftar
+        run: |
+          # Kriterium "modul yang bisa di-build sendiri": folder NN-* yang punya
+          # vite.config.js. Modul 00 (skrip Node, tanpa Vite) dan 11 (markdown)
+          # tersaring keluar dengan sendirinya, tanpa pengecualian manual.
+          peta=()
+          for d in [0-9][0-9]-*/; do
+            if [ -f "${d}vite.config.js" ]; then
+              peta+=("${d%/}")
+            fi
+          done
+          printf 'Folder modul: %s\n' "${peta[*]}"
+          # Penjaga terhadap matriks yang menyusut diam-diam: 0 pekerjaan bukan
+          # berarti sukses, tapi berarti langkah ini tidak memeriksa apa pun.
+          if [ "${#peta[@]}" -lt 10 ]; then
+            echo "Hanya ${#peta[@]} folder modul ditemukan -- seharusnya >= 10." >&2
+            echo "Kalau memang modul dikurangi, angka batas ini ikut disesuaikan SAAT itu juga."
+            exit 1
+          fi
+          modul_json=$(printf '%s\n' "${peta[@]}" | node -e 'let d="";process.stdin.on("data",(c)=>{d+=c;}).on("end",()=>{console.log(JSON.stringify(d.trim().split("\n")));})')
+          echo "modul=$modul_json" >> "$GITHUB_OUTPUT"
+          echo "Matriks yang dipakai: $modul_json"
+
+  modul:
+    # Build berdiri sendiri per folder modul, dengan lockfile & node_modules
+    # milik folder itu sendiri -- jalur yang dipakai pembelajar saat mengerjakan
+    # satu modul saja.
+    name: Build ${{ matrix.modul }}
+    needs: isi-matriks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        modul: ${{ fromJSON(needs.isi-matriks.outputs.modul) }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          # Folder modul sendiri sebenarnya masih jalan di Node 18 (tidak ada
+          # eslint/react-router di dalamnya); 22 dipilih supaya sejalan dengan
+          # versi dasar yang didukung hub. Lihat docs/HANDOFF.md §4.
+          node-version: "22"
+          cache: npm
+          # Lockfile folder ini saja, bukan lockfile root: sebelas lockfile di
+          # repo ini tidak boleh saling menyeret ke cache.
+          cache-dependency-path: ${{ matrix.modul }}/package-lock.json
+
+      - name: Install (npm ci dengan lockfile modul sendiri)
+        working-directory: ${{ matrix.modul }}
+        run: npm ci
+
+      - name: Build mandiri (vite build)
+        working-directory: ${{ matrix.modul }}
+        run: npm run build
+
+      - name: Pastikan gaya dasar ikut ter-bundle
+        working-directory: ${{ matrix.modul }}
+        # H4: tiap styles.css hanya meng-impor ../../styles/base.css. Build
+        # tetap sukses walau impor itu salah arah, tapi hasilnya kehilangan
+        # seluruh gaya global -- jadi yang diperiksa adalah isi berkas CSS-nya.
+        run: |
+          css=$(cat dist/assets/*.css)
+          for penanda in "system-ui" "box-sizing" "button"; do
+            if ! printf '%s' "$css" | grep -q "$penanda"; then
+              echo "dist tidak memuat '$penanda' -- dugaannya impor ../../styles/base.css putus." >&2
+              exit 1
+            fi
+          done
+          echo "OK: ${#css} byte CSS, gaya dasar dari styles/base.css ikut ter-bundle."
 
   probe:
     # Nama job sengaja tidak menyisipkan nilai input: input dispatch berasal
@@ -146,7 +248,7 @@ jobs:
           # jadi pemotongan prefix dan pengecekan newline tidak bekerja sampai
           # `printf %b` mengubahnya -- dan saat itu baris kosongnya sudah telanjur.
           hasil=()
-          for cmd in "npm ci" "npm run lint" "npm run format:check" "npm run build"; do
+          for cmd in "npm ci" "npm run lint" "npm run format:check" "npm run test" "npm run build"; do
             echo "########## $cmd"
             if bash -c "$cmd"; then
               hasil+=("| $cmd | lulus |")
