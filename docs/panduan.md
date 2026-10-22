@@ -18,6 +18,11 @@ applikasinya.
 
 ## 2. Cara paling nyaman: Hub (semua modul di satu tempat)
 
+Ada juga versi yang sudah jalan di internet: **<https://kursus-react.vercel.app>**.
+Buka, klik modul di sidebar, selesai — tidak perlu Node, tidak perlu `npm install`.
+Pakai itu untuk **membaca dan mencoba contoh**; pakai langkah di bawah begitu kamu
+mau **mengubah** kode, karena perubahanmu hanya terlihat di laptop sendiri.
+
 Tidak perlu pindah folder satu-satu. Dari root proyek:
 
 ```bash

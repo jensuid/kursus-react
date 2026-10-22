@@ -8,6 +8,12 @@ pembelajar, lihat [`docs/panduan.md`](../docs/panduan.md).
 Jalankan: `npm install && npm run dev` → **http://localhost:5200**
 (port 5200 khusus hub; modul mandiri tetap di 5173 — lihat `vite.config.js`).
 
+Versi produksi: **https://kursus-react.vercel.app** — di-deploy dari repo ini lewat
+`vercel.json` di root. Berkas config itu ada karena rute `/modul/:num` bukan file di
+`dist/`; tanpa rewrite SPA, memuat `/modul/05` langsung dari URL berujung 404
+di produksi padahal di dev tidak pernah kelihatan. Cara deploy & hasil verifikasinya:
+`docs/HANDOFF.md` §3.7.
+
 | File | Isi |
 |---|---|
 | `modules.js` | **Satu-satunya daftar modul.** Tambah modul = tambah entri di sini; sidebar, rute, dan kartu ringkasan ikut muncul sendiri. Entri punya `type`: `react` (dimuat malas), `es6`, atau `md`. |

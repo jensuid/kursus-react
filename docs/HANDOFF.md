@@ -103,6 +103,7 @@ tetap benar, dan pembelajar tidak perlu tahu perintah ini ada.
 | `package.json` | Dep hub (react, react-dom, react-router-dom, react-markdown, remark-gfm) + devDep tooling (ESLint, Prettier, Vitest, jsdom, Testing Library) + script dev/build/preview/lint/format/test |
 | `vite.config.js` | Plugin React; `server.port 5200` + `strictPort`; blok `test:` milik Vitest (jsdom, setup, `include: tests/**`) |
 | `index.html` | Entry, `<div id="root">` → `/src/main.jsx` |
+| `vercel.json` | Config deploy: `framework: vite`, `buildCommand`, `outputDirectory: dist`, plus rewrite SPA `/(.*) → /index.html` supaya deep link `/modul/05` tidak 404 di situs live (§3.7) |
 | `styles/base.css` | **Satu-satunya sumber gaya global** (body, `#root` 760px, h1/h2, button, input, code) — diimpor hub + kesepuluh modul (H4) |
 | `src/main.jsx` | `createRoot` + `StrictMode` + `BrowserRouter` |
 | `src/Hub.jsx` | Layout sidebar (3 grup) + definisi `<Routes>`; halaman 11 diimpor **malas** di sini |
@@ -228,7 +229,7 @@ Dahulu ada tiga celah di daftar ini. Dua sudah tertutup — build mandiri per fo
 1. **Perilaku hanya Modul 10 yang diuji.** Hub (sidebar, routing, tombol Salin di halaman sungguhan) dan modul 01-09 belum punya uji perilaku; yang terjaga baru struktur + keutuhan materi. Tambah uji per fitur, jangan klaim "semua perilaku teruji".
 2. **Tampilan sungguhan.** Yang diperiksa adalah ADA-nya aturan CSS di `dist`, bukan bahwa halaman terlihat benar. Regresi visual (kontras, tumpukan, overflow) masih butuh mata manusia / browser.
 3. **Kompatibilitas versi kecil modul.** Job `modul` cuma pakai Node 22; ia membuktikan "folder ini bisa di-build sendiri", bukan "di semua versi Node". Matriks Node x matriks folder = 30 job, tidak sepadan untuk proyek ini.
-4. **Deploy/preview.** Tidak ada job yang menaikkan hub ke Vercel/Netlify; `dist/` hanya dibuang di runner.
+4. **Deploy bukan bagian dari CI.** Hub memang sudah live di `https://kursus-react.vercel.app`, tapi naik lewat `vercel deploy --prod` manual dari mesin maintainer (§3.7). Tidak ada job CI yang melakukan ini, jadi push ke `main` **tidak** mengubah situs — dan situs yang live tidak menjamin situs berisi kode `main` terkini.
 
 Badge untuk README: `![CI](https://github.com/jensuid/kursus-react/actions/workflows/ci.yml/badge.svg)` — nama file workflow menentukan URL badge ini.
 
@@ -306,6 +307,57 @@ harus diterima: 7 berkas = 7 jsdom, dan satu uji DOM pernah melewati `testTimeou
 bawaan 5 detik ketika suite penuh bersaing dengan puluhan proses yang di-spawn uji
 dedup (merah sekali, hijau saat diulang). `vite.config.js` menaikkan batasnya ke 20
 detik — itu kelonggaran lingkungan, bukan perbaikan uji lambat.
+
+### 3.7 Deploy hub ke Vercel
+
+Live di **<https://kursus-react.vercel.app>** (alias produksi; proyek `kursus-react`,
+account `wyiing01-8628`). Build dikerjakan di cluster Vercel (`vite build`, ±20 detik),
+bukan diunggah dari laptop.
+
+```bash
+vercel deploy --prod     # dari folder repo, setelah `vercel login` sekali
+```
+
+`vercel link --project kursus-react --yes` pernah dijalankan dan meninggalkan
+`.vercel/project.json` + `.env.local` (berisi `VERCEL_OIDC_TOKEN`). Keduanya tidak
+masuk git — terbuktikan, bukan diasumsikan:
+`git check-ignore -v` membalas `.gitignore:4:.vercel/` untuk `.vercel/project.json`
+dan `.gitignore:7:.env*` untuk `.env.local` (baris 6 `*.local` juga cocok; yang
+dilaporkan pola terakhir). `framework: vite` membuat `npm run build` dan `dist/`
+terdeteksi sendiri; `buildCommand`/`outputDirectory` diulang eksplisit supaya
+perubahan struktur `dist` nanti kelihatan sebagai perubahan config, bukan kejutan.
+
+**Kenapa `vercel.json` ada (dan kenapa gejalanya tidak muncul di dev).** Hub memakai
+React Router, jadi `/modul/05` bukan berkas di dalam `dist/`. Tanpa rewrite, memuat
+URL itu secara langsung berarti meminta file yang tidak ada. `npm run dev` tidak
+pernah menangkapnya karena dev server Vite sudah melakukan fallback SPA sendiri —
+jenis bug yang hanya hidup di produksi. Rewrite `/(.*) → /index.html` tetap aman
+untuk aset: di Vercel filesystem menang atas rewrite, jadi `/assets/*` dilayani
+seperti biasa dan hanya path tanpa berkas yang jatuh ke `index.html`.
+
+Verifikasi pada 22 Okt 2026 (deploy dari `ba9056d` + `vercel.json`), semuanya lewat
+**request anonim** — tidak ada login di jalur ini:
+
+- `curl -o /dev/null -w "%{http_code}"`: `/` **200**, `/modul/05` **200**, `/modul/11` **200**, tanpa redirect ke halaman login.
+- HTML `/` menyebut `<title>Kursus React — Hub Modul</title>` dan `/assets/index-DMrxvv-X.js` — **hash yang sama dengan build lokal**, jadi yang tersaji benar-benar hasil `npm run build` repo ini, bukan artefak lama.
+- `/assets/index-Cvg6vY31.css` (5.118 byte) berisi `system-ui` + `box-sizing`: rantai `styles/base.css` utuh sampai produksi.
+- Browser nyata: `/` (sidebar 3 grup + 12 kartu), `/modul/05` (form ter-render & ber-gaya), `/modul/10` (3 tugas bawaan; menambah "uji deploy" → **3 → 4** dan ringkasan ikut "1 dari 4"), `/modul/11` (1 `h2` + 10 `h3` + 8 `pre`, nol sisa pagar markdown). **0 error console, 0 request 4xx/5xx.**
+- Catatan jujur dari verifikasi itu: screenshot tidak bisa diambil (viewport browser headless/lagi tersembunyi), jadi bukti visual datang dari accessibility tree + `getComputedStyle`, bukan dari gambar. Dan chunk lazy membuat snapshot pertama `/modul/10` & `/modul/11` masih berisi "Memuat modul…" — yang menunggu dulu baru menyimpulkan.
+
+**Yang sengaja BELUM dipasang:**
+
+- **Auto-deploy saat push.** Jalur Git Vercel butuh Login Connection GitHub di akun ini; `vercel link` pernah membalas `Failed to link jensuid/kursus-react. You need to add a Login Connection to your GitHub account first. (400)`. Sisanya tinggal `vercel git connect` atau job CI dengan secret `VERCEL_API_TOKEN` — keduanya menambah permukaan akses/secret untuk proyek kecil, jadi belum diambil. Konsekuensinya dicatat di §3.5 butir 4: CI hijau ≠ situs hijau-terkini.
+- **`vercel.json` tidak menambah `.vercelignore`.** Upload mengikuti `.gitignore`, jadi 10 folder `node_modules` dan `dist/` tidak ikut naik — yang membuat upload kecil dan build-nya di cluster benar-benar berarti.
+
+**Folder kerja deploy harus diabaikan di TIGA tempat**, dan yang ketiga hampir tidak
+terlihat: `.gitignore` (`.vercel/`, `.vercel-tmp/`, `.env*`), `.prettierignore`, dan
+`ignores` di `eslint.config.js`. Yang terakhir sungguh dibutuhkan: ESLint flat config
+tidak mengabaikan dot-folder dengan sendirinya, begitu `.vercel-tmp/vercel-login.cjs`
+ada maka `npm run lint` langsung melaporkan **7 error `no-undef`** (`process`,
+`console`, `setTimeout`) — skrip Node dinilai dengan globals browser. Gejalanya cuma
+muncul di mesin yang pernah menjalankan deploy; di CI tidak, karena foldernya
+tidak ikut ter-checkout. Sesudah `"**/.vercel/**", "**/.vercel-tmp/**"` ditambahkan,
+lint kembali **0 error / 11 warning** (11 warning itu materi ajar, §3.4).
 
 ---
 
@@ -482,6 +534,7 @@ Diverifikasi pada kondisi saat ini (dev server + browser headless + uji otomatis
 | CI bentuk sekarang | `gh run view 39739605225 --json jobs` | ✅ **14 job: 13 lulus + `probe` ter-*skip*** — dua kaki `hub` (Node 22/24) dengan langkah uji, `isi-matriks` menghasilkan 10 folder dari disk, 10 job `Build <modul>` lulus dengan CSS 666-2173 byte |
 | Batas versi uji | job probe A/B (`node_version=20` vs `22`) | ✅ Node 20.20.2: `npm run test` **GAGAL** (26 uji node-only lulus, 4 berkas DOM mati); Node 22.23.3: **53 lulus**. Rinciannya di §3.5 |
 | Perkakas hemat disk (H3) | `npm run setup:shared -- --dry-run --force`, `df -k`, build & dev folder hasil klon | ✅ Rencana 9 folder terbaca benar; eksekusi `--force` → `Diisi: 9 \| Lewat: 0 \| Gagal: 0`, ruang tersedia volume naik **412.884 KB** (§4). `05-forms`/`10-final-project` tetap bisa `build` + dev dari pohon klon. 19 uji perilaku juga menutup jalur non-reflink (direkam dengan `cp` palsu). Di CI (ext4, run `39755787630`): `67 passed \| 5 skipped (72)` per kaki hub — yang di-skip cuma mekanika klon, keputusan tetap jalan |
+| Situs live (Vercel) | `curl` anonim + browser nyata di `https://kursus-react.vercel.app` | ✅ `/`, `/modul/05`, `/modul/10`, `/modul/11` semuanya **200 tanpa login**; hash bundle produksi (`index-DMrxvv-X.js`) identik dengan build lokal; CSS 5.118 byte berisi `system-ui`; interaksi Todo terukur di produksi (**3 → 4** item, ringkasan "1 dari 4"); **0 error console, 0 request 4xx/5xx**; deep link tidak 404 karena rewrite `vercel.json` (§3.7) |
 
 Perintah re-verifikasi cepat untuk pengembang berikutnya:
 
@@ -490,6 +543,7 @@ npm run lint && npm run test && npm run build
 npm run dev            # hub di http://localhost:5200
 # lalu cek: / , /modul/00 , /modul/05 (tombol Salin) , /modul/10 (tambah tugas) , /modul/11 (markdown)
 cd 05-forms && npm run dev && npm run build   # modul mandiri tetap hidup sendiri
+curl -o /dev/null -w "%{http_code}\n" https://kursus-react.vercel.app/modul/05   # rewrite SPA masih hidup? (§3.7)
 ```
 
 ---
@@ -585,7 +639,7 @@ Diurutkan dari rasio nilai/tenaga tertinggi.
 - [x] ~~**Monorepo workspaces (H3)**~~ — **DITOLAK sadar**, bukan ditunda: lihat §7.1 untuk alasan dan pemicu yang membuat keputusan ini boleh dibuka lagi.
 - [ ] **KUIS di akhir tiap modul** di hub (soal pilihan ganda per modul), data disimpan di `modules.js`.
 - [ ] **Halaman "sandi/penjelasan istilah"** (glosarium) hasil ekstraksi dari semua README.
-- [ ] **Deploy hub** ke Vercel/Netlify sebagai situs kursus publik (build statis; modul 00/11 tetap terbaca).
+- [x] ~~**Deploy hub** ke Vercel/Netlify sebagai situs kursus publik~~ — **SELESAI** via Vercel: <https://kursus-react.vercel.app>, deploy manual `vercel deploy --prod` (§3.7). Modul 00/11 tetap terbaca di produksi. Yang masih terbuka cuma **auto-deploy saat push** (butuh Login Connection GitHub / token di CI — alasan & pilihan di §3.7).
 - [ ] **Versi TypeScript paralel** (mis. folder `ts/`) tanpa mengubah jalur belajar JS murni.
 
 ---
@@ -626,6 +680,9 @@ Diurutkan dari rasio nilai/tenaga tertinggi.
 | `npm run setup:shared` berhenti dengan "Volume ini tidak mendukung clone APFS/reflink" | Filesystem bukan APFS/btrfs (ext4, NFS, drive USB ber-format FAT), atau probe menyentuh volume lain | Bukan kegagalan yang perlu diatasi: skrip memang menolak menyalin 500 MB diam-diam. Install per folder seperti biasa (`cd <modul> && npm install`), atau `--copy` kalau memang mau pohon duplikat (tidak hemat disk) |
 | `setup:shared` melaporkan `LEWAT <modul> … lockfile tidak setara` | Folder itu sungguh punya dependensi berbeda dari donor — dan itu harus begitu | Jangan pakai `--force` untuk memaksa. `npm install` di folder itu. Penjaga ini pernah terbukti diperlukan: normalisasi berbasis `grep` salah untuk lockfile satu baris (§3.6) |
 | Folder hasil klon tiba-tiba `Cannot find module` atau cache Vite basi | CoW tidak mengubah isi, tapi siapa pun bisa `npm install` ulang di folder itu dan pohonnya tidak lagi setara donor | Ganti dengan install biasa: `rm -rf <modul>/node_modules && cd <modul> && npm install`. Tidak ada yang rusak permanen — klon memang cuma hemat ruang, bukan state yang harus dijaga. Dev server yang tetap salah: `npm run dev -- --force` |
+| `/modul/05` diketik langsung di browser lokal → okay, tapi di situs live → 404 | Rewrite SPA di `vercel.json` hilang atau tertimpa; `dist/` memang hanya berisi `index.html` di root | Pulihkan `"rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]` (§3.7) lalu `vercel deploy --prod`. Jangan cuma cek `npm run dev` — dev server Vite melakukan fallback sendiri, jadi gejalanya tidak pernah muncul di sana |
+| `vercel deploy` melapor `Failed to link … You need to add a Login Connection to your GitHub account first. (400)` | Akun Vercel ini belum punya Login Connection GitHub, jadi integrasi Git tidak bisa dipakai | **Bukan kegagalan deploy** — `vercel link --project <nama> --yes` tetap membuat proyek dan menghubungkan folder; hanya auto-deploy dari push yang tidak tersedia. Jalur lain: `vercel deploy --prod` manual (§3.7) atau job CI dengan token |
+| Pembelajar melaporkan tidak bisa membuka kursus | (Kemungkinan) Deployment Protection Vercel aktif dan minta login | Ukur dulu, jangan langsung menyalahkan: `curl -o /dev/null -w "%{http_code}\n" https://kursus-react.vercel.app/modul/05` tanpa login. **200** = bukan itu penyebabnya (saat §3.7 ditulis, request anonim lolos). **401/302 ke halaman login Vercel** = ubah Settings → Deployment Protection di proyek |
 | Build lambat / memory tinggi | Semua modul ikut ter-bundle saat glob `?raw` | Normal (modul 00 kecil); kalau bertambah besar, batasi pola glob |
 
 Log dev server bisa dialihkan: `npm run dev > /tmp/hub-dev.log 2>&1 &`.
@@ -661,6 +718,7 @@ Urutan kurikulum dan konsep yang ditanam — berguna kalau mau menambah modul ag
 - `styles/base.css` — satu-satunya sumber gaya global (H4); header file itu menjelaskan kenapa `#root` diperlakukan beda di hub.
 - `tests/` — 7 berkas uji (§3.6). `npm run test` adalah gerbang tercepat sebelum push.
 - `scripts/dedup-modules.sh` — perkakas hemat disk untuk maintainer, dipanggil lewat `npm run setup:shared` (§4). Tidak dipakai oleh CI; dijaga `tests/dedup-modules.test.js`.
+- `vercel.json` — config deploy produksi; situs kursus yang bisa dibuka pembelajar: <https://kursus-react.vercel.app> (§3.7).
 - `docs/plan.md` — snapshot rencana awal (arsip; jangan diedit sebagai sumber kebenaran).
 - `11-next-steps.md` — kurikulum lanjutan, dirender sebagai HTML di rute `/modul/11`.
 - Tiap `<modul>/README.md` — teori per modul.
@@ -670,4 +728,4 @@ Urutan kurikulum dan konsep yang ditanam — berguna kalau mau menambah modul ag
 
 ## 13. Ringkasan Satu Paragraf
 
-Proyek ini adalah kursus React 12 modul berbahasa Indonesia yang berjalan di dua mode: hub terpadu di root (Vite + React 19 + React Router 7 + react-markdown, semua demo 01-10 dimuat via `React.lazy`, modul 00/11 dibaca via `?raw`, port 5200) dan modul mandiri per folder (port 5173). Semua terverifikasi lewat build, browser, dan **72 uji otomatis**, di repository Git publik dengan CI empat job yang hijau di `main` (terakhir: 14 job, 13 lulus + probe ter-*skip*): matriks Node, probe versi, sepuluh build modul mandiri, dan pemeriksaan gaya dasar di `dist`. Hutang teknis yang terdaftar di §7 sudah tertutup semua: yang tersisa bukan pekerjaan tertunda, tapi **keputusan yang sengaja diambil** (H3 dan H5 won't-fix, §7.1 — harga duplikasi H3 sudah diturunkan perkakas §4 tanpa mengubah strukturnya; Prettier tidak menyentuh materi ajar, §3.4) dan fitur baru di backlog §8 yang nilainya pedagogis, bukan rekayasa. Mulailah dari sana kalau memang mau menambah fitur -- bukan dari merapikan yang sudah ada.
+Proyek ini adalah kursus React 12 modul berbahasa Indonesia yang berjalan di dua mode: hub terpadu di root (Vite + React 19 + React Router 7 + react-markdown, semua demo 01-10 dimuat via `React.lazy`, modul 00/11 dibaca via `?raw`, port 5200) dan modul mandiri per folder (port 5173). Semua terverifikasi lewat build, browser, dan **72 uji otomatis**, di repository Git publik dengan CI empat job yang hijau di `main` (terakhir: 14 job, 13 lulus + probe ter-*skip*): matriks Node, probe versi, sepuluh build modul mandiri, dan pemeriksaan gaya dasar di `dist`. Kursusnya sendiri sudah terbuka untuk pembelajar di <https://kursus-react.vercel.app>, di-deploy manual dari CLI dan **bukan** dari CI (§3.7). Hutang teknis yang terdaftar di §7 sudah tertutup semua: yang tersisa bukan pekerjaan tertunda, tapi **keputusan yang sengaja diambil** (H3 dan H5 won't-fix, §7.1 — harga duplikasi H3 sudah diturunkan perkakas §4 tanpa mengubah strukturnya; Prettier tidak menyentuh materi ajar, §3.4) dan fitur baru di backlog §8 yang nilainya pedagogis, bukan rekayasa. Mulailah dari sana kalau memang mau menambah fitur -- bukan dari merapikan yang sudah ada.

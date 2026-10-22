@@ -5,6 +5,13 @@
 Selamat datang! Ini adalah kursus praktis belajar front-end dengan **React**.
 Setiap modul berisi **README penjelasan konsep (bahasa Indonesia)** + **kode yang bisa langsung dijalankan**. Belajar paling efektif: baca → jalankan → modifikasi → kerjakan latihan.
 
+> **Mau lihat hasilnya dulu tanpa install apa pun?** Seluruh kursus sudah berjalan di
+> **[https://kursus-react.vercel.app](https://kursus-react.vercel.app)**. Klik modul di
+> sidebar, dan halaman dalam pun bisa dibuka langsung — misalnya
+> [kursus-react.vercel.app/modul/10](https://kursus-react.vercel.app/modul/10).
+> Itu versi jadi dari kode di repo ini. Kamu tetap butuh langkah install di bawah
+> begitu mau **mengubah** kode (modifikasi contoh, kerjakan latihan, lihat hot reload).
+
 ## Prasyarat
 
 - Node.js **v20 atau lebih baru** disarankan (cek dengan `node -v`).
@@ -50,6 +57,9 @@ menampilkan modul 00 & 11 sebagai bacaan.
 npm install      # sekali saja
 npm run dev      # buka http://localhost:5200
 ```
+
+Hasilnya sama dengan situs live di atas, hanya jalan di laptopmu — jadi aman
+diubah-ubah.
 
 Di dalam hub: klik sidebar untuk berpindah modul, dan gunakan tombol **Salin**
 untuk menyalin jalur file sumber/README yang ingin kamu buka & edit di editor
