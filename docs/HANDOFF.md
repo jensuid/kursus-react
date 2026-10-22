@@ -208,6 +208,17 @@ Bentuk ini tidak rapuh: push dokumen saja berikutnya (`ebfcb97`, run `3974200776
 
 Merah yang pertama (dan justru yang paling berguna) terjadi karena bentuknya tidak rapuh — run `39752865532` (commit `d39e44b`, berkas uji dedup baru): **dua kaki `hub` gagal, 4 uji `dedup-modules` merah di Node 22 dan 24**, sementara suite lokal hijau penuh. Penyebabnya lingkungan, bukan logika: runner CI memakai ext4, `cp -c` tidak ada di sana, jadi skrip menolak sebelum sempat memilih folder — sementara ujiannya mengira sedang menguji keputusan. Perbaikan & pelajarannya dicatat di §3.6 dan §4; suite sesudah itu 7 berkas / 72 uji. Run perbaikannya (`ea9776f`, run `39755787630`) hijau lagi dengan bentuk yang sama (14 job, 13 lulus + probe ter-*skip*), dan kedua kaki `hub` melaporkan `Test Files 7 passed (7)` + `Tests 67 passed | 5 skipped (72)`. Angka *skip* itu harus dibaca benar: yang di-*skip* hanyalah **mekanika klon** (`describe.runIf` reflink) dan uji "repo sebenarnya" (runner tidak punya `node_modules` modul) — lima penjaga keputusan tetap jalan di ext4, dan itulah yang tadinya merah.
 
+Run berikutnya yang menyentuh berkas uji dedup (stamen, §4) melewati gerbang yang
+sama dari arah berlawanan: `ab57857` + `e9af062`, run `39767564475` — **14 job,
+0 gagal**, kedua kaki `hub` melaporkan `Test Files 7 passed (7)` + `Tests 76
+passed | 5 skipped (81)`, dengan `tests/dedup-modules.test.js (28 tests | 5
+skipped)`. Angka skip-nya tetap yang lama (mekanika klon + uji "repo sebenarnya"),
+yang berarti sembilan uji stamen baru memang dijalankan di ext4 — bukan di-*skip*
+oleh lingkungan. Cara mereproduksi kondisi itu di mesin APFS: bikin `cp` palsu yang
+hanya menolak `-c`, taruh di depan `PATH`, lalu `npx vitest run
+tests/dedup-modules.test.js` → `24 passed | 4 skipped (28)` (4, bukan 5, karena
+blok "repo sebenarnya" ikut jalan di mesin yang modulnya ter-install).
+
 Perubahan yang lahir dari menemukan warning CI, bukan dari niat awal:
 
 - `actions/checkout` dan `actions/setup-node` dinaikkan **v4 → v7**. CI memuntahkan warning bahwa keduanya menargetkan Node 20 dan dipaksa jalan di Node 24. Setelah kenaikan, warning hilang dan matriks tetap hijau (diverifikasi ulang lewat API annotation).
@@ -582,7 +593,7 @@ Diverifikasi pada kondisi saat ini (dev server + browser headless + uji otomatis
 | Uji otomatis | `npm run test` | ✅ **81 uji pada 7 berkas**; penjaga uji pernah dibuktikan bisa gagal lewat mutasi (§3.6). Angka **53** yang muncul di §3.5 adalah hasil run CI pada commit sebelum berkas uji dedup ada — bukan angka yang salah |
 | CI bentuk sekarang | `gh run view 39739605225 --json jobs` | ✅ **14 job: 13 lulus + `probe` ter-*skip*** — dua kaki `hub` (Node 22/24) dengan langkah uji, `isi-matriks` menghasilkan 10 folder dari disk, 10 job `Build <modul>` lulus dengan CSS 666-2173 byte |
 | Batas versi uji | job probe A/B (`node_version=20` vs `22`) | ✅ Node 20.20.2: `npm run test` **GAGAL** (26 uji node-only lulus, 4 berkas DOM mati); Node 22.23.3: **53 lulus**. Rinciannya di §3.5 |
-| Perkakas hemat disk (H3) | `npm run setup:shared -- --dry-run --force`, `df -k`, build & dev folder hasil klon | ✅ Rencana 9 folder terbaca benar; eksekusi `--force` → `Diisi: 9 \| Lewat: 0 \| Gagal: 0`, ruang tersedia volume naik **412.884 KB** (§4). `05-forms`/`10-final-project` tetap bisa `build` + dev dari pohon klon. 28 uji perilaku juga menutup jalur non-reflink (direkam dengan `cp` palsu) dan tiga keputusan stamen: `SIAP` (klon belum berubah; jalan kedua untuk sembilan pohon = **5,3 detik**, `Diisi: 0 \| Siap: 9`), `BEDA` (sisipan satu berkas terdeteksi lengkap dengan angkanya dan berkas itu **tidak** dihapus), `LEWAT` (pohon tanpa stamen hasil `npm install`). Di CI (ext4, run `39755787630`): `67 passed \| 5 skipped (72)` per kaki hub — yang di-skip cuma mekanika klon, keputusan tetap jalan (angka itu run sebelum stamen ada; angka sekarang 81 uji, §3.6) |
+| Perkakas hemat disk (H3) | `npm run setup:shared -- --dry-run --force`, `df -k`, build & dev folder hasil klon | ✅ Rencana 9 folder terbaca benar; eksekusi `--force` → `Diisi: 9 \| Lewat: 0 \| Gagal: 0`, ruang tersedia volume naik **412.884 KB** (§4). `05-forms`/`10-final-project` tetap bisa `build` + dev dari pohon klon. 28 uji perilaku juga menutup jalur non-reflink (direkam dengan `cp` palsu) dan tiga keputusan stamen: `SIAP` (klon belum berubah; jalan kedua untuk sembilan pohon = **5,3 detik**, `Diisi: 0 \| Siap: 9`), `BEDA` (sisipan satu berkas terdeteksi lengkap dengan angkanya dan berkas itu **tidak** dihapus), `LEWAT` (pohon tanpa stamen hasil `npm install`). Di CI (ext4, run `39767564475`): `76 passed \| 5 skipped (81)` per kaki hub, `dedup-modules.test.js (28 tests \| 5 skipped)` — yang di-skip cuma mekanika klon; keputusan, termasuk sembilan uji stamen, tetap jalan di ext4 (rinciannya §3.5) |
 | Situs live (Vercel) | `curl` anonim + browser nyata di `https://kursus-react.vercel.app` | ✅ `/`, `/modul/05`, `/modul/10`, `/modul/11` semuanya **200 tanpa login**; hash bundle produksi (`index-DMrxvv-X.js`) identik dengan build lokal; CSS 5.118 byte berisi `system-ui`; interaksi Todo terukur di produksi (**3 → 4** item, ringkasan "1 dari 4"); **0 error console, 0 request 4xx/5xx**; deep link tidak 404 karena rewrite `vercel.json` (§3.7) |
 
 Perintah re-verifikasi cepat untuk pengembang berikutnya:
