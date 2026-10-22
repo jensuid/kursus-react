@@ -155,7 +155,9 @@ Dua job:
 | Job | Kapan | Isi |
 |---|---|---|
 | `hub` | push ke `main`, tiap PR, dispatch tanpa isian | matriks Node **20 / 22 / 24** × (`npm ci` → `lint` → `format:check` → jalankan script Modul 00 → `build`) |
-| `probe` | dispatch dengan isian `node_version` | satu versi Node bebas, untuk menguji klaim dukungan. `continue-on-error: true` karena hasilnya informasi, bukan gerbang |
+| `probe` | dispatch dengan isian `node_version` | satu versi Node bebas, untuk menguji klaim dukungan. Semua pemeriksaan jalan tanpa berhenti dini; hasilnya jadi tabel di Run Summary. `continue-on-error: true` di level job karena hasilnya informasi, bukan gerbang |
+
+Cara memakai probe: `gh workflow run ci.yml --ref main -f node_version=18`, lalu baca `gh run view <id> --log` (baris `| ... | GAGAL |`) — jangan percaya status hijau job-nya.
 
 Poin yang tidak terlihat dari sekilas baca:
 
@@ -163,7 +165,9 @@ Poin yang tidak terlihat dari sekilas baca:
 - **`cache-dependency-path: package-lock.json`** — wajib. Repo ini punya **11 lockfile**; tanpa baris itu cache ikut menyeret lockfile modul yang tidak dipakai job ini.
 - **`npm ci`, bukan `npm install`** — range `^` di `package.json` membuat `install` bisa naik versi sendiri, sehingga hasil CI tidak bisa diulang. Lihat §4: yang tertulis `^19.1.0` tapi terpasang `19.3.1`.
 - **Langkah "Jalankan script Modul 00"** — Modul 00 adalah script Node murni dan **tidak masuk `vite build`**, jadi tanpa langkah ini kerusakannya tak pernah kelihatan. Langkah ini menjalankan seluruh `00-es6-crash-course/*.js` (10 file, termasuk `format.js`/`utils.js`).
-- **Batas bawah Node adalah 20, bukan 18** — dikonfirmasi dari field `engines`: `react-router-dom@7.18.4` minta `>=20.0.0`, `eslint@10.13.0` minta `^20.19.0 || ^22.13.0 || >=24`. Ini juga yang membuat README lama ("Node v18+") salah dan sudah dikoreksi. **Modul 01-10 mandiri dan Modul 00 masih aman di Node 18** — hanya hub yang naik.
+- **Batas bawah Node: 20 untuk tooling, tapi kursus tetap jalan di 18** — ini diverifikasi lewat job probe, bukan dari field `engines` saja. Hasil pada Node **18.20.8**: `npm ci` lulus (dengan hujan `npm warn EBADENGINE`), `npm run build` **lulus** (79 modul, 1.06s), hanya `npm run lint` **gagal** dengan `TypeError: util.styleText is not a function` — API itu baru ada di Node ≥20.12, sesuai `engines` ESLint 10. Kesimpulan praktis: pembelajar aman di 18; 20+ dibutuhkan untuk mengembangkan/menjalankan lint. Angka `engines` `react-router-dom` (`>=20`) tidak menjadi penghalang karena router dipakai di browser, dan build-nya lolos.
+- **`concurrency` harus menyertakan `github.event_name`** — bukan estetika. Grup yang hanya berisi `ref` membuat `workflow_dispatch` ke `main` dan push ke `main` saling membatalkan (ref-nya sama: `refs/heads/main`); ini benar-benar terjadi dan run push saya berstatus `cancelled` gara-gara probe manual.
+- **Jangan pakai `continue-on-error` per langkah kalau hasilnya dibaca lewat API** — dengan opsi itu aktif, API GitHub melapor langkah sebagai `success` walaupun perintahnya gagal. Sinyal hilang, dan saya nyaris menyimpulkan "Node 18 lulus semua" dari situ. Karena itu probe memakai satu langkah yang mengumpulkan hasil sendiri (array `hasil[]`) lalu menulis tabel ke `$GITHUB_STEP_SUMMARY`.
 - **Input `workflow_dispatch` disanitasi** lewat step validasi (`grep -Eq '^[0-9]+(\.[0-9]+){0,2}$'`) sebelum dipakai `setup-node`, dan tidak pernah disisipkan langsung ke shell atau `name:` job.
 
 **Yang TIDAK dicakup CI ini** (jangan sampai salah baca sebagai "semua sudah terjaga"):
@@ -196,7 +200,7 @@ Runtime teruji: **Node v24.19.0 / npm 11.17.0**. Untuk versi minimum, fakta bera
 | eslint 10.13.0 | `^20.19.0 \|\| ^22.13.0 \|\| >=24` |
 | vite 6.4.5 | `^18.0.0 \|\| ^20.0.0 \|\| >=22.0.0` |
 
-Konsekuensinya: **hub butuh Node 20+**, sedangkan **modul 01-10 mandiri + Modul 00 masih jalan di Node 18** (mereka hanya memakai Vite + React; `grep` memastikan tidak ada modul yang bergantung pada router/eslint). Klaim "Node ≥18 belum diverifikasi" yang dulu tertulis di sini sudah ditutup: angka di README dikoreksi, dan CI kini menguji 20/22/24 pada tiap push. Node 18 sengaja tidak masuk matriks karena akan merah permanen.
+Konsekuensinya, **dan sudah diuji nyata lewat job probe** (lihat §3.5): hub butuh Node 20+ **hanya untuk tooling lint**. Di Node **18.20.8**, `npm ci` dan `npm run build` untuk hub tetap lulus (79 modul ter-transform), `npm run lint` yang gagal (`util.styleText is not a function`). Modul 00 dan modul 01-10 mandiri juga aman di 18 (hanya Vite + React; `grep` memastikan tidak ada modul yang bergantung pada router/eslint). README dahulu menulis "Node v18+" tanpa dasar — sekarang sudah dikoreksi berdasarkan fakta ini, dan angka 18 sengaja tidak masuk matriks `hub` karena akan merah permanen di langkah lint.
 
 > Catatan: `@vitejs/plugin-react` **wajib** ada untuk React 19 + Vite 6 (JSX transform). Jangan dihapus saat rapikan dependensi.
 

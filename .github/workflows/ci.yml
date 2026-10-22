@@ -27,10 +27,12 @@ on:
         required: false
         default: ""
 
-# Run terbaru membatalkan run lama pada branch yang sama, supaya tidak
-# ada antrian yang saling menunggu setelah beberapa push beruntun.
+# Run terbaru membatalkan run lama pada pemicu yang sama. `event_name` ikut
+# dalam group karena `workflow_dispatch` ke main berbagi `ref` dengan run push:
+# tanpa itu, probe manual akan membatalkan CI yang sedang menjaga main
+# (terbukti terjadi saat percobaan pertama).
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
@@ -128,18 +130,48 @@ jobs:
       - name: Versi yang terpakai
         run: node -v && npm -v
 
-      # Tiap pemeriksaan berdiri sendiri (continue-on-error per langkah),
-      # supaya kegagalan pertama tidak menyembunyikan hasil yang berikut.
-      # Probe ada untuk mengumpulkan informasi, bukan untuk berhenti dini.
-      # (Di job `hub` urutan ketat justru yang diinginkan: gagal cepat.)
-      - name: npm ci
-        continue-on-error: true
-        run: npm ci
+      # Semua pemeriksaan dijalankan dalam satu langkah yang mengumpulkan
+      # hasil, BUKAN sebagai langkah terpisah berserta `continue-on-error`.
+      # Alasannya terbukti di lapangan: dengan continue-on-error, API GitHub
+      # melapor langkah sebagai "success" walaupun perintahnya gagal, sehingga
+      # hasilnya cuma bisa dibaca dengan membedah log mentah. Tabel di bawah
+      # membaca tanpa ambiguitas, dan kegagalan diberi annotation ::warning::.
+      - name: Semua pemeriksaan (jalan semua, tanpa berhenti dini)
+        env:
+          NODE_VER: ${{ steps.validate.outputs.node }}
+        run: |
+          gagal=0
+          # Array, bukan string yang digabung dengan "\n" literal. Versi string
+          # menipu: `baris="$baris\n| x |"` menyimpan backslash-n sebagai teks,
+          # jadi pemotongan prefix dan pengecekan newline tidak bekerja sampai
+          # `printf %b` mengubahnya -- dan saat itu baris kosongnya sudah telanjur.
+          hasil=()
+          for cmd in "npm ci" "npm run lint" "npm run format:check" "npm run build"; do
+            echo "########## $cmd"
+            if bash -c "$cmd"; then
+              hasil+=("| $cmd | lulus |")
+            else
+              hasil+=("| $cmd | GAGAL |")
+              echo "::warning::\`$cmd\` gagal pada Node $NODE_VER"
+              gagal=1
+            fi
+          done
+          {
+            echo "## Hasil probe Node $NODE_VER"
+            echo ""
+            if [ "$gagal" -eq 0 ]; then
+              echo "Semua pemeriksaan lulus."
+            else
+              echo "Ada pemeriksaan yang gagal — lihat tabel."
+            fi
+            echo ""
+            # Header + separator wajib: tanpa ini GitHub menampilkan tabel apa
+            # adanya sebagai teks polos. Tidak boleh ada baris kosong antara
+            # separator dan baris isi, kalau tidak tabelnya putus di situ.
+            echo "| Pemeriksaan | Hasil |"
+            echo "|---|---|"
+            printf '%s\n' "${hasil[@]}"
+          } | tee "$GITHUB_STEP_SUMMARY"
 
-      - name: Lint
-        continue-on-error: true
-        run: npm run lint
-
-      - name: Build
-        continue-on-error: true
-        run: npm run build
+      # Sengaja tidak `exit $gagal`: job probe informatif (continue-on-error di
+      # level job), supaya warna run tidak berubah merah karena percobaan manual.

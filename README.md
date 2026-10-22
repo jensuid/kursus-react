@@ -7,12 +7,12 @@ Setiap modul berisi **README penjelasan konsep (bahasa Indonesia)** + **kode yan
 
 ## Prasyarat
 
-- Node.js **v20 atau lebih baru** terpasang (cek dengan `node -v`)
-  Angka ini untuk **hub**. Modul 00 (script Node) dan modul 01-10 yang dijalankan
-  sendiri masih mendukung **Node 18**, karena hanya memakai Vite + React.
-  Hub butuh 20 akibat dua dependensinya: `react-router-dom@7` (`>=20`) dan
-  `eslint@10` (`^20.19 || ^22.13 || >=24`). Batas ini dijaga otomatis oleh
-  CI di `.github/workflows/ci.yml`.
+- Node.js **v20 atau lebih baru** disarankan (cek dengan `node -v`).
+  Sudah diuji nyata di CI: di **Node 18 kursus ini tetap jalan** — Modul 00,
+  modul 01-10, dan bahkan `npm run build` hub semuanya lulus. Yang gagal di 18
+  hanya `npm run lint` (ESLint 10 butuh `util.styleText` yang baru ada di
+  Node ≥20.12). Jadi: sebagai pembelajar kamu aman di 18; sebagai pengembang/
+  penjaga proyek, pakai 20 ke atas. CI dijaga di `.github/workflows/ci.yml`.
 - Editor kode (VS Code / Qoder / lainnya)
 - Pengetahuan HTML & CSS dasar
 
