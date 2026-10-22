@@ -16,6 +16,8 @@
 node_modules/
 dist/
 .vite/
+.vercel/
+.vercel-tmp/
 
 # Semua modul pembelajaran (00-10) dan panduannya
 00-es6-crash-course/

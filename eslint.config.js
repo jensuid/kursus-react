@@ -12,10 +12,22 @@ import prettier from "eslint-config-prettier/flat";
  *  - uji otomatis (tests/**)
  *
  * node_modules diabaikan bawaan oleh ESLint; dist/ eksplisit diabaikan.
+ * Begitu juga dua folder kerja perkakas deploy: `.vercel` (berisi project.json)
+ * dan `.vercel-tmp` (berisi skrip `.cjs` sementara). Keduanya sudah
+ * di-gitignore sehingga TIDAK akan ada di checkout CI — tapi di mesin
+ * maintainer ada, dan ESLint flat config mengabaikan dot-folder secara tidak
+ * otomatis: tanpa baris ini `npm run lint` mendadak 7 error `no-undef`
+ * (`process`/`console`/`setTimeout`) dari skrip deploy yang memang milik Node.
  */
 export default [
   {
-    ignores: ["**/dist/**", "**/node_modules/**", "docs/**"],
+    ignores: [
+      "**/dist/**",
+      "**/node_modules/**",
+      "docs/**",
+      "**/.vercel/**",
+      "**/.vercel-tmp/**",
+    ],
   },
 
   // --- Dasar untuk semua sumber kode ---
