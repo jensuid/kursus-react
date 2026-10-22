@@ -1,25 +1,37 @@
 import { Suspense, useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
 import { findModule } from "../modules.js";
+import { copyText } from "../copyText.js";
 
 function CopyPath({ path }) {
-  const [copied, setCopied] = useState(false);
+  // Tiga status, bukan dua. Versi lama menelan kegagalan secara diam-diam:
+  // tombol tetap berbunyi "Salin" dan pengguna tidak tahu ada yang gagal.
+  const [status, setStatus] = useState("diam");
 
   async function salin() {
-    try {
-      await navigator.clipboard.writeText(path);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      /* clipboard bisa gagal di beberapa browser; abaikan diam-diam */
-    }
+    const tersalin = await copyText(path);
+    setStatus(tersalin ? "tersalin" : "gagal");
+    setTimeout(() => setStatus("diam"), 2000);
   }
+
+  const label = {
+    diam: "Salin",
+    tersalin: "Tersalin!",
+    // Kata kerja, bukan cuma ikon: kalau gagal, pengguna perlu tahu bahwa
+    // yang gagal itu penyalinan — bukan aplikasinya yang rusak.
+    gagal: "Gagal menyalin",
+  }[status];
 
   return (
     <>
       <code className="hub-path">{path}</code>{" "}
-      <button className="hub-copy-btn" onClick={salin} type="button">
-        {copied ? "Tersalin!" : "Salin"}
+      <button
+        className="hub-copy-btn"
+        onClick={salin}
+        type="button"
+        aria-live="polite"
+      >
+        {label}
       </button>
     </>
   );

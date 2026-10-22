@@ -1,75 +1,25 @@
 /* ===========================================================================
    HUB.CSS — gaya global untuk app utama (hub).
    Dua bagian:
-   1) Base styles: meniru styles.css tiap modul supaya demo 01-10 tetap tampil
-      benar (karena hub meng-import App.jsx LANGSUNG, bukan main.jsx).
+   1) Base styles: DITETES dari styles/base.css — file yang sama juga diimpor
+      oleh tiap modul, jadi tidak ada lagi salinan di 11 tempat.
    2) Layout hub: sidebar + area konten, kartu overview, badge, blok kode.
    Kelas hub selalu diawali "hub-" agar tidak menabrak kelas milik modul.
+
+   Aturan CSS: `@import` harus berada sebelum semua rule lain di file ini.
    =========================================================================== */
 
-/* ---------- 1) Base styles (dipakai oleh demo modul) ---------- */
-* {
-  box-sizing: border-box;
-}
+@import "../styles/base.css";
 
-html,
-body {
+/* ---------- 1) Base styles: hanya bagian yang perlu beda di hub ---------- */
+
+/* styles/base.css membatasi #root sampai 760px agar modul yang jalan sendiri
+   tampak rapi. Di hub, #root justru membungkus layout sidebar + konten penuh,
+   jadi batas itu dilepas. Lebar konten diatur oleh .hub-content. */
+#root {
+  max-width: none;
   margin: 0;
   padding: 0;
-}
-
-body {
-  font-family:
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    Roboto,
-    sans-serif;
-  background: #f6f7fb;
-  color: #1f2330;
-  line-height: 1.6;
-}
-
-/* Tidak lagi membatasi #root, karena #root sekarang membungkus layout hub. */
-
-h1 {
-  font-size: 1.6rem;
-}
-
-h2 {
-  font-size: 1.15rem;
-  margin-top: 2rem;
-  border-bottom: 2px solid #e2e5ef;
-  padding-bottom: 0.3rem;
-}
-
-button {
-  font: inherit;
-  padding: 0.45rem 0.9rem;
-  border-radius: 8px;
-  border: 1px solid #c8cde0;
-  background: #fff;
-  cursor: pointer;
-}
-
-button:hover {
-  background: #eef1fa;
-}
-
-input,
-select,
-textarea {
-  font: inherit;
-  padding: 0.45rem 0.6rem;
-  border-radius: 8px;
-  border: 1px solid #c8cde0;
-}
-
-code {
-  background: #e9ebf4;
-  padding: 0.1rem 0.35rem;
-  border-radius: 5px;
-  font-size: 0.9em;
 }
 
 /* ---------- 2) Layout hub ---------- */
@@ -360,6 +310,106 @@ code {
   padding: 0.15rem 0.5rem;
   font-size: 0.82rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Markdown yang dirender (Modul 11). Selektornya menarget elemen hasil
+   react-markdown — class tidak bisa dipasang dari dalam markdown. */
+.hub-md {
+  font-size: 0.95rem;
+}
+
+.hub-md > :first-child {
+  margin-top: 0;
+}
+
+/* Tingkat heading di bawah ini sudah TURUN satu langkah dari markdown
+   aslinya — pemetaannya ada di `headingTurunTingkat`,
+   src/pages/NextStepsPage.jsx. Jadi: h2 = judul file (dari "#"), h3 = nama bab
+   (dari "##"), h4 = sub-bab. Jangan "memperbaiki" ini dengan menaikkan
+   tingkatnya kembali; halaman ini sudah punya h1 di header hub. */
+.hub-md h2 {
+  font-size: 1.2rem;
+}
+
+.hub-md h3 {
+  font-size: 1.02rem;
+  margin: 2.2rem 0 0.5rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 2px solid #e2e5ef;
+}
+
+.hub-md h4 {
+  font-size: 0.95rem;
+  margin: 1.4rem 0 0.3rem;
+}
+
+.hub-md p,
+.hub-md li {
+  color: #2c3140;
+}
+
+.hub-md ul,
+.hub-md ol {
+  padding-left: 1.4rem;
+}
+
+.hub-md li {
+  margin: 0.3rem 0;
+}
+
+/* Blok kode terliput: <pre><code>. Dasar `code` memberi latar terang, jadi
+   keduanya harus dibenahi supaya isinya tidak tampak bertumpuk dua latar. */
+.hub-md pre {
+  background: #14192b;
+  color: #e7eaf6;
+  border-radius: 12px;
+  padding: 0.9rem 1.1rem;
+  overflow: auto;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.hub-md pre code {
+  background: none;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+}
+
+.hub-md table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.9rem;
+}
+
+.hub-md th,
+.hub-md td {
+  border: 1px solid #dfe3f0;
+  padding: 0.45rem 0.6rem;
+  text-align: left;
+}
+
+.hub-md th {
+  background: #eef1fa;
+}
+
+.hub-md blockquote {
+  margin: 1rem 0;
+  padding: 0.2rem 0.9rem;
+  border-left: 3px solid #c8cde0;
+  color: #4b5563;
+  background: #f2f4fb;
+  border-radius: 0 8px 8px 0;
+}
+
+.hub-md a {
+  color: #2563eb;
+}
+
+.hub-md hr {
+  border: none;
+  border-top: 1px solid #dfe3f0;
+  margin: 1.6rem 0;
 }
 
 /* Responsif: sembunyikan sidebar di layar sempit */

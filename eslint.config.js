@@ -9,6 +9,7 @@ import prettier from "eslint-config-prettier/flat";
  *  - hub (src/**)
  *  - semua modul React (NN-nama/src/**)
  *  - skrip ES6 Node (00-es6-crash-course/**)
+ *  - uji otomatis (tests/**)
  *
  * node_modules diabaikan bawaan oleh ESLint; dist/ eksplisit diabaikan.
  */
@@ -76,6 +77,30 @@ export default [
       ecmaVersion: "latest",
       sourceType: "module",
       globals: globals.node,
+    },
+  },
+
+  // --- Uji otomatis: JSX + campuran globals browser (jsdom) dan Node ---
+  // Berkas uji di-eksekusi Vitest, bukan browser atau Node polos. Diperlukan
+  // eksplisit: tanpa blok ini, `tests/**` tidak cocok dengan blok mana pun dan
+  // ESLint diam-diam tidak memeriksa apa pun di dalamnya.
+  {
+    files: ["tests/**/*.{js,jsx}"],
+    languageOptions: {
+      ecmaVersion: "latest",
+      sourceType: "module",
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+      },
+      parserOptions: {
+        ecmaFeatures: { jsx: true },
+      },
+    },
+    rules: {
+      // Dalam uji, memanggil `render()` tanpa memakai hasil return-nya adalah
+      // pola normal (kita ambil elemennya lewat `screen`).
+      "no-unused-expressions": "off",
     },
   },
 

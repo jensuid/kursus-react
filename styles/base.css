@@ -1,0 +1,83 @@
+/* ===========================================================================
+   STYLES/BASE.CSS — SATU sumber gaya global untuk seluruh kursus.
+   ---------------------------------------------------------------------------
+   Dipakai oleh:
+     - tiap modul mandiri  ->  <modul>/src/styles.css  melakukan @import ke sini
+     - hub                 ->  src/hub.css            melakukan @import ke sini
+   Ini menutup duplikasi lama (isi yang sama disalin di 11 tempat): mengubah
+   gaya global sekarang cukup di satu file.
+
+   PENTING soal #root:
+   Batas lebar 760px di bawah ini adalah tampilan modul berdiri sendiri. Hub
+   memakai #root untuk membungkus layout sidebar + konten, jadi hub HARUS
+   menimpa aturan ini (lihat bagian "Base styles" di src/hub.css). Jangan
+   memindahkan batas lebar ini keluar dari #root tanpa mengecek keduanya.
+   =========================================================================== */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  background: #f6f7fb;
+  color: #1f2330;
+  line-height: 1.6;
+}
+
+#root {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+
+h1 {
+  font-size: 1.6rem;
+}
+
+h2 {
+  font-size: 1.15rem;
+  margin-top: 2rem;
+  border-bottom: 2px solid #e2e5ef;
+  padding-bottom: 0.3rem;
+}
+
+button {
+  font: inherit;
+  padding: 0.45rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid #c8cde0;
+  background: #fff;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #eef1fa;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  padding: 0.45rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid #c8cde0;
+}
+
+code {
+  background: #e9ebf4;
+  padding: 0.1rem 0.35rem;
+  border-radius: 5px;
+  font-size: 0.9em;
+}
