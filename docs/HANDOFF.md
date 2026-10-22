@@ -148,6 +148,32 @@ Di blok `00-es6-crash-course/**` pada `eslint.config.js`:
 
 Kode React (hub + modul) memakai preset `react-hooks.configs.recommended` — yaitu `rules-of-hooks` (error) dan `exhaustive-deps` (warn). **Sengaja tidak** memakai `recommended-latest` yang tersedia di react-hooks 7: preset itu membawa aturan era React Compiler (`purity`, `immutability`, `set-state-in-effect`, `static-components`, `use-memo`) yang akan menyalahi pola ajar yang disengaja dan menenggelamkan pemula dalam pesan yang belum relevan bagi mereka.
 
+### 3.5 CI — `.github/workflows/ci.yml`
+
+Dua job:
+
+| Job | Kapan | Isi |
+|---|---|---|
+| `hub` | push ke `main`, tiap PR, dispatch tanpa isian | matriks Node **20 / 22 / 24** × (`npm ci` → `lint` → `format:check` → jalankan script Modul 00 → `build`) |
+| `probe` | dispatch dengan isian `node_version` | satu versi Node bebas, untuk menguji klaim dukungan. `continue-on-error: true` karena hasilnya informasi, bukan gerbang |
+
+Poin yang tidak terlihat dari sekilas baca:
+
+- **`fail-fast: false`** — sengaja, supaya satu versi Node yang gagal tidak menyembunyikan hasil versi lain.
+- **`cache-dependency-path: package-lock.json`** — wajib. Repo ini punya **11 lockfile**; tanpa baris itu cache ikut menyeret lockfile modul yang tidak dipakai job ini.
+- **`npm ci`, bukan `npm install`** — range `^` di `package.json` membuat `install` bisa naik versi sendiri, sehingga hasil CI tidak bisa diulang. Lihat §4: yang tertulis `^19.1.0` tapi terpasang `19.3.1`.
+- **Langkah "Jalankan script Modul 00"** — Modul 00 adalah script Node murni dan **tidak masuk `vite build`**, jadi tanpa langkah ini kerusakannya tak pernah kelihatan. Langkah ini menjalankan seluruh `00-es6-crash-course/*.js` (10 file, termasuk `format.js`/`utils.js`).
+- **Batas bawah Node adalah 20, bukan 18** — dikonfirmasi dari field `engines`: `react-router-dom@7.18.4` minta `>=20.0.0`, `eslint@10.13.0` minta `^20.19.0 || ^22.13.0 || >=24`. Ini juga yang membuat README lama ("Node v18+") salah dan sudah dikoreksi. **Modul 01-10 mandiri dan Modul 00 masih aman di Node 18** — hanya hub yang naik.
+- **Input `workflow_dispatch` disanitasi** lewat step validasi (`grep -Eq '^[0-9]+(\.[0-9]+){0,2}$'`) sebelum dipakai `setup-node`, dan tidak pernah disisipkan langsung ke shell atau `name:` job.
+
+**Yang TIDAK dicakup CI ini** (jangan sampai salah baca sebagai "semua sudah terjaga"):
+
+1. Build mandiri modul 01-10 — masih manual, belum matriks folder.
+2. Kebenaran runtime / perilaku aplikasi — belum ada test sama sekali.
+3. **Keutuhan materi ajar.** `format:check` juga membaca `.prettierignore`, jadi kalau tabel perbandingan sintaks di Modul 01 rusak atau terformat ulang, **build tetap sukses dan lint tetap hijau**. Kerusakan jenis ini hanya tertangkap jika pemeriksaannya ditulis sendiri (mis. uji yang mengasumsikan `01-let-const-arrow.js` masih memuat baris pembandingnya).
+
+Badge untuk README: `![CI](https://github.com/jensuid/kursus-react/actions/workflows/ci.yml/badge.svg)` — nama file workflow menentukan URL badge ini.
+
 ---
 
 ## 4. Dependensi & Runtime
@@ -162,7 +188,15 @@ Terekam saat verifikasi (root):
 | vite | ^6.3.5 | 6.4.5 |
 | @vitejs/plugin-react | ^4.4.1 | 4.7.0 |
 
-Runtime teruji: **Node v24.19.0 / npm 11.17.0**. README menyebut Node ≥18 — belum diverifikasi di 18/20, jadi anggap 20+ sebagai minimum yang aman.
+Runtime teruji: **Node v24.19.0 / npm 11.17.0**. Untuk versi minimum, fakta berasal dari field `engines` paket yang terpasang (bukan dugaan):
+
+| Paket | `engines.node` |
+|---|---|
+| react-router-dom 7.18.4 | `>=20.0.0` |
+| eslint 10.13.0 | `^20.19.0 \|\| ^22.13.0 \|\| >=24` |
+| vite 6.4.5 | `^18.0.0 \|\| ^20.0.0 \|\| >=22.0.0` |
+
+Konsekuensinya: **hub butuh Node 20+**, sedangkan **modul 01-10 mandiri + Modul 00 masih jalan di Node 18** (mereka hanya memakai Vite + React; `grep` memastikan tidak ada modul yang bergantung pada router/eslint). Klaim "Node ≥18 belum diverifikasi" yang dulu tertulis di sini sudah ditutup: angka di README dikoreksi, dan CI kini menguji 20/22/24 pada tiap push. Node 18 sengaja tidak masuk matriks karena akan merah permanen.
 
 > Catatan: `@vitejs/plugin-react` **wajib** ada untuk React 19 + Vite 6 (JSX transform). Jangan dihapus saat rapikan dependensi.
 
@@ -251,7 +285,7 @@ sisanya masih terbuka.
 | H5 | ⬜ Terbuka | **Modul 00 tidak bisa dijalankan dari hub** (butuh Node) | Pembelajar harus buka terminal | Opsional: tambah panel "output" yang menjalankan skrip lewat Web Worker/`new Function`, **tapi** hati-hati: `import/export` antar-file tidak jalan tanpa bundler. Nilai edukatif model saat ini justru "ES6 murni = jalan di Node" |
 | H6 | ⬜ Terbuka | **Markdown 11 dirender mentah** di `<pre>`, bukan HTML | Kurang nyaman dibaca, heading/code block polos | Tambah renderer ringan (`marked`/`react-markdown`) **hanya di hub** agar modul tetap bebas dependensi |
 | H7 | ⬜ Terbuka | **Tombol "Salin" butuh secure context** (`navigator.clipboard`) | Gagal diam-diam saat diakses via HTTP non-localhost/jaringan | Sudah ada `try/catch`, tapi beri fallback `document.execCommand('copy')` atau tampilkan teks saja |
-| H8 | 🟡 **Sebagian beres** | Dahulu: tidak ada ESLint/Prettier sama sekali | Regresi tak terdeteksi | **Sudah ada**: ESLint 10 flat config (`eslint.config.js`) + Prettier 3 (lihat §3.4). Sisa: **automated testing** (Vitest + React Testing Library) dan **CI** (workflow `npm ci && npm run lint && npm run build`) |
+| H8 | 🟡 **Sebagian beres** | Dahulu: tidak ada ESLint/Prettier/CI | Regresi tak terdeteksi | **Sudah ada**: ESLint 10 flat config (§3.4), Prettier 3, CI dengan matriks Node (§3.5). Sisa: **automated testing** (Vitest + React Testing Library) dan perluasan cakupan CI ke build mandiri tiap modul |
 | H9 | ✅ **Beres** | Dahulu: `docs/panduan.md` kosong 0 byte | Membingungkan | Sekarang **Panduan Pakai untuk Pembelajar**. Sudah dirapikan dari tempelan chat awal: judul + isi disinkronkan ke model hub, kalimat penutup percakapan dihapus. `docs/plan.md` = snapshot rencana awal (arsip) |
 | H10 | ⬜ Terbuka | **Tidak ada `README` untuk hub itu sendiri** di `src/` | Arsitektur hub hanya terdokumentasi di sini | Pertimbangkan `src/README.md` singkat |
 | H11 | ⬜ Terbuka | Port dev **5173** dipakai hub; modul mandiri juga 5173 | Tidak bisa menjalankan hub + modul bersamaan tanpa berebut port | Jalankan salah satu, atau `npm run dev -- --port 5180` |
@@ -268,7 +302,7 @@ Diurutkan dari rasio nilai/tenaga tertinggi.
 - [x] ~~**Tambah remote + push**~~ — **selesai**: `origin` = `https://github.com/jensuid/kursus-react` (public), `main` tracking `origin/main`.
 - [x] ~~**Bereskan H9**~~ — **selesai**: `docs/panduan.md` jadi Panduan Pakai untuk pembelajar, sudah termasuk bagian hub.
 - [x] ~~**ESLint + Prettier (H8)**~~ — **selesai**: lihat §3.4 untuk cara pakai & keputusan cakupannya.
-- [ ] **CI sederhana**: workflow `npm ci && npm run lint && npm run build` di root.
+- [x] ~~**CI sederhana**~~ — **selesai**: `.github/workflows/ci.yml` (lihat §3.5). Matriks Node 20/22/24 + probe manual, mencakup lint, `format:check`, eksekusi script Modul 00, dan build hub.
 - [ ] **Automated testing**: Vitest + React Testing Library (minimal uji modul 10: tambah/toggle/hapus todo).
 
 ### mid — 1–2 hari masing-masing
@@ -354,4 +388,4 @@ Urutan kurikulum dan konsep yang ditanam — berguna kalau mau menambah modul ag
 
 ## 13. Ringkasan Satu Paragraf
 
-Proyek ini adalah kursus React 12 modul berbahasa Indonesia yang berjalan di dua mode: hub terpadu di root (Vite + React 19 + React Router 7, semua demo 01-10 dimuat via `React.lazy`, modul 00/11 dibaca via `?raw`) dan modul mandiri per folder. Semua sudah terverifikasi lewat build dan browser dengan 0 error, dan kini sudah berada di repository Git (branch `main`, commit awal `772d5c7`) setelah artefak `dist/` usang dibersihkan. Yang paling menghambat pengembangan berikutnya bukan fitur, tapi fondasi rekayasa yang tersisa: **belum ada remote/CI/lint**, artefak duplikat (base CSS, `node_modules` per modul), dan markdown hub yang masih dirender mentah. Mulai dari backlog *near* di §8.
+Proyek ini adalah kursus React 12 modul berbahasa Indonesia yang berjalan di dua mode: hub terpadu di root (Vite + React 19 + React Router 7, semua demo 01-10 dimuat via `React.lazy`, modul 00/11 dibaca via `?raw`) dan modul mandiri per folder. Semua sudah terverifikasi lewat build dan browser dengan 0 error, kini berada di repository Git publik (`main` di `github.com/jensuid/kursus-react`), dan sudah punya ESLint + Prettier + CI bermatriks Node. Yang tersisa bukan fitur, tapi fondasi rekayasa: **belum ada automated testing**, cakupan CI belum menyentuh build mandiri tiap modul, artefak duplikat (base CSS, `node_modules` per modul), dan markdown hub yang masih dirender mentah. Mulai dari backlog *near* di §8.

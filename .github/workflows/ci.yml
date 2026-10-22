@@ -1,0 +1,133 @@
+# CI — memeriksa hub di beberapa versi Node sekaligus.
+#
+# Keputusan yang perlu diketahui sebelum file ini diubah:
+#   * Matriks dimulai dari Node 20, BUKAN 18, walau README dulu menulis
+#     "Node >= 18". Alasannya dari `engines` dependensi yang terpasang:
+#       - react-router-dom 7.18.4 -> node >=20.0.0
+#       - eslint 10.13.0          -> node ^20.19.0 || ^22.13.0 || >=24
+#     Jadi Node 18 tidak didukung oleh hub, dan angka di README sudah
+#     disesuaikan (lihat docs/HANDOFF.md §4 dan §3.5).
+#   * CI ini hanya menyentuh root (hub) + script Modul 00 yang dijalankan
+#     dengan `node`. Folder 01-10 TIDAK di-build di sini — mereka punya
+#     lockfile sendiri dan hub meng-import App.jsx mereka sebagai file
+#     sumber biasa. Menutup celah itu = wacana "matrix 10 modul".
+#   * CI hanya sekuat pemeriksaan yang ada di dalamnya. `format:check` di
+#     sini tunduk pada .prettierignore, sehingga kerusakan *materi ajar*
+#     (mis. tabel perbandingan sintaks di Modul 01) tidak akan tertangkap.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      node_version:
+        description: "Probe satu versi Node di luar matriks, mis. 18 atau 23 (kosongkan untuk memakai matriks)"
+        required: false
+        default: ""
+
+# Run terbaru membatalkan run lama pada branch yang sama, supaya tidak
+# ada antrian yang saling menunggu setelah beberapa push beruntun.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hub:
+    name: Hub (Node ${{ matrix.node }})
+    # Saat dispatch dengan isian versi, job ini dilewati dan job `probe`
+    # yang bekerja.
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.node_version == '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      # Sibling tetap jalan walau satu versi gagal: kita ingin tahu
+      # *versi mana saja* yang bermasalah, bukan berhenti di yang pertama.
+      fail-fast: false
+      matrix:
+        node: ["20", "22", "24"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          # Kunci cache hanya pada lockfile root. Repo ini punya 11 lockfile
+          # (root + sepuluh modul); tanpa baris ini cache ikut menyeret yang
+          # tidak dipakai job ini.
+          cache-dependency-path: package-lock.json
+
+      # `npm ci`, bukan `npm install`: install bisa menaikkan versi di dalam
+      # range `^` dan membuat hasil CI tidak bisa diulang. ci memaksa tepat
+      # seperti lockfile, jadi regresi dari upstream terdeteksi sebagai
+      # perubahan yang disengaja, bukan kebetulan.
+      - name: Install (npm ci)
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check (khusus infra hub)
+        run: npm run format:check
+
+      # Modul 00 adalah script Node murni: tidak ikut masuk `vite build`,
+      # jadi tanpa langkah ini kerusakannya tidak akan pernah terlihat di CI.
+      - name: Jalankan seluruh script Modul 00
+        run: |
+          shopt -s nullglob
+          files=(00-es6-crash-course/*.js)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "Tidak ada file .js ditemukan di 00-es6-crash-course/ — aneh, gagal."
+            exit 1
+          fi
+          for f in "${files[@]}"; do
+            echo "--- node $f"
+            node "$f" > /dev/null || exit 1
+          done
+          echo "OK: ${#files[@]} script Modul 00 berjalan tanpa error."
+
+      - name: Build hub
+        run: npm run build
+
+  probe:
+    # Nama job sengaja tidak menyisipkan nilai input: input dispatch berasal
+    # dari payload event, dan tidak perlu muncul di metadata.
+    name: Probe Node (manual)
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.node_version != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Probe memang diharapkan bisa gagal; hasilnya dipakai sebagai informasi,
+    # bukan sebagai gerbang yang memblokir apa pun.
+    continue-on-error: true
+    steps:
+      # Nilai input jangan pernah disuntikan langsung ke action atau shell:
+      # hanya pola versi (angka dan titik) yang diterima, sisanya dibuang.
+      - name: Validasi versi Node yang diminta
+        id: validate
+        env:
+          REQUESTED: ${{ github.event.inputs.node_version }}
+        run: |
+          if ! printf '%s' "$REQUESTED" | grep -Eq '^[0-9]+(\.[0-9]+){0,2}$'; then
+            echo "Versi tidak valid: harus berupa angka, mis. 18 atau 20.11.1" >&2
+            exit 1
+          fi
+          echo "node=$REQUESTED" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.validate.outputs.node }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Versi yang terpakai
+        run: node -v && npm -v
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build

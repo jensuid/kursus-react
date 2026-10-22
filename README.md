@@ -1,11 +1,18 @@
 # Kursus React Terstruktur — Dari Nol Sampai Mampu Membuat App Sendiri
 
+[![CI](https://github.com/jensuid/kursus-react/actions/workflows/ci.yml/badge.svg)](https://github.com/jensuid/kursus-react/actions/workflows/ci.yml)
+
 Selamat datang! Ini adalah kursus praktis belajar front-end dengan **React**.
 Setiap modul berisi **README penjelasan konsep (bahasa Indonesia)** + **kode yang bisa langsung dijalankan**. Belajar paling efektif: baca → jalankan → modifikasi → kerjakan latihan.
 
 ## Prasyarat
 
-- Node.js v18+ terpasang (cek dengan `node -v`)
+- Node.js **v20 atau lebih baru** terpasang (cek dengan `node -v`)
+  Angka ini untuk **hub**. Modul 00 (script Node) dan modul 01-10 yang dijalankan
+  sendiri masih mendukung **Node 18**, karena hanya memakai Vite + React.
+  Hub butuh 20 akibat dua dependensinya: `react-router-dom@7` (`>=20`) dan
+  `eslint@10` (`^20.19 || ^22.13 || >=24`). Batas ini dijaga otomatis oleh
+  CI di `.github/workflows/ci.yml`.
 - Editor kode (VS Code / Qoder / lainnya)
 - Pengetahuan HTML & CSS dasar
 

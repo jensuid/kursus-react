@@ -11,6 +11,9 @@ node -v
 ```
 Kalau muncul versi (misal `v22.x`), siap. Kursus ini sudah ada di folder yang sedang kamu buka.
 
+Versi minimum: **Node 20 ke atas** kalau kamu mau memakai hub. Kalau kamu hanya
+menjalankan Modul 00 di terminal atau satu modul secara manual, **Node 18 masih cukup**.
+
 ## 2. Cara paling nyaman: Hub (semua modul di satu tempat)
 
 Tidak perlu pindah folder satu-satu. Dari root proyek:
