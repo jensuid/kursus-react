@@ -1,0 +1,144 @@
+/* todo.css — gaya khusus Todo App (diimpor dari App.jsx) */
+.app {
+  max-width: 520px;
+  margin: 0 auto;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 8px 30px rgba(31, 35, 48, 0.08);
+  padding: 24px;
+}
+
+.app-header {
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+.app-header h1 {
+  margin: 0;
+}
+
+.ringkas {
+  color: #7a8099;
+  margin: 4px 0 12px;
+}
+
+.progress-track {
+  height: 8px;
+  background: #eef1fa;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3f8cff, #2fbf71);
+  transition: width 0.4s ease;
+}
+
+.todo-input {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.todo-input input {
+  flex: 1;
+}
+
+.todo-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.todo-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid #eef1fa;
+  border-radius: 10px;
+  background: #fbfcff;
+}
+
+.todo-item .teks {
+  flex: 1;
+  cursor: default;
+}
+
+.todo-item.selesai .teks {
+  text-decoration: line-through;
+  color: #9aa0b5;
+}
+
+.edit-input {
+  flex: 1;
+}
+
+.aksi {
+  display: flex;
+  gap: 4px;
+}
+
+.aksi button {
+  border: none;
+  background: transparent;
+  padding: 2px 4px;
+  font-size: 1rem;
+}
+
+.kosong {
+  text-align: center;
+  color: #9aa0b5;
+  padding: 24px 0;
+}
+
+.todo-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #eef1fa;
+  flex-wrap: wrap;
+}
+
+.sisa {
+  color: #7a8099;
+  font-size: 0.9rem;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.tab {
+  border: none;
+  background: transparent;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+}
+
+.tab.aktif {
+  background: #e7f0ff;
+  color: #1f6feb;
+  font-weight: 600;
+}
+
+.bersihkan {
+  font-size: 0.85rem;
+  border: none;
+  background: transparent;
+  color: #e05656;
+}
+
+.bersihkan:disabled {
+  color: #c3c8d8;
+  cursor: not-allowed;
+}

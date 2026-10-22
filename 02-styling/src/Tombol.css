@@ -1,0 +1,71 @@
+/* Gaya komponen Tombol — CSS biasa seperti yang kamu kenal.
+   Diimpor dari App.jsx dengan: import "./Tombol.css" */
+
+.tombol {
+  border: none;
+  border-radius: 8px;
+  padding: 0.5rem 1.1rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s, transform 0.05s;
+}
+
+.tombol:active {
+  transform: translateY(1px);
+}
+
+/* Varian lewat penamaan class — pola yang sangat sering dipakai */
+.tombol-primary {
+  background: #3f8cff;
+  color: white;
+}
+
+.tombol-ghost {
+  background: transparent;
+  color: #3f8cff;
+  border: 1.5px solid #3f8cff;
+}
+
+.tombol-danger {
+  background: #e05656;
+  color: white;
+}
+
+/* :hover, animasi, media query TETAP di file CSS — bukan di JS */
+.tombol:hover {
+  filter: brightness(1.08);
+}
+
+.kartu {
+  border: 2px solid #d5d9ea;
+  border-radius: 14px;
+  padding: 16px;
+  background: white;
+  animation: masuk 0.3s ease;
+}
+
+@keyframes masuk {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.tabel {
+  border: 1px solid #d5d9ea;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.baris {
+  padding: 0.55rem 0.9rem;
+  background: #fff;
+}
+
+.baris-ganjil {
+  background: #fff7e0;
+}

@@ -1,0 +1,307 @@
+# Dokumen Hand-off — Kursus React + Hub Terpadu
+
+> **Untuk:** developer/pengajar yang melanjutkan proyek ini
+> **Lokasi:** `/Volumes/JensData/Jensu-Projects/frontend-basic/react-ui`
+> **Status:** Fitur lengkap & terverifikasi. Siap dilanjutkan.
+> **Baca pertama:** bagian [Mulai Cepat](#mulai-cepat) lalu [Hutang Teknis](#hutang-teknis--kendala-yang-diketahui).
+
+---
+
+## 1. Ringkasan Proyek
+
+Kursus React berbahasa Indonesia terdiri dari **12 modul bertahap** (ES6 → fundamental → state/data → hooks → proyek akhir), dibungkus oleh **satu app utama ("hub")** yang memuat semua modul dalam satu dev server dengan sidebar + routing.
+
+Dua cara memakai proyek ini (keduanya sengaja dipertahankan):
+
+| Model | Untuk siapa | Perintah |
+|---|---|---|
+| **Hub** (root) | Pembelajar — jelajah semua modul tanpa pindah folder | `npm install && npm run dev` di root |
+| **Modul mandiri** | Pengajar — izolate satu modul, uji build sendiri | `cd 03-events-state && npm install && npm run dev` |
+
+Prinsip desain yang **jangan dilanggar** saat mengembangkan:
+
+1. Modul pembelajaran tetap **JavaScript murni** (tanpa TypeScript) agar fokus konsep.
+2. Tiap modul berdiri sendiri dan **tidak boleh di-import silang** oleh modul lain.
+3. Modul hanya bergantung pada `react` + `react-dom` — **tanpa router/axios/UI-kit**, supaya ringan dan tidak membingungkan pemula. Router hanya hidup di hub.
+4. Komentar kode & README memakai **bahasa Indonesia**; penamaan identifier tetap **Inggris**.
+5. Yang diajarkan adalah **model mental React**, bukan hafalan API.
+
+---
+
+## 2. Mulai Cepat
+
+```bash
+cd /Volumes/JensData/Jensu-Projects/frontend-basic/react-ui
+npm install          # sekali di root (±20 detik)
+npm run dev          # http://localhost:5173
+```
+
+Verifikasi build produksi:
+
+```bash
+npm run build        # harus lolos; hasil di dist/ (abaikan, sudah .gitignore)
+```
+
+Jalankan latihan ES6 (tidak lewat browser — ini skrip Node):
+
+```bash
+cd 00-es6-crash-course
+node 01-let-const-arrow.js
+```
+
+Hentikan dev server: `Ctrl + C`.
+
+---
+
+## 3. Arsitektur
+
+### 3.1 Bentuk besar
+
+```
+                        ┌──────────────────────────────────┐
+   root src/            │  HUB (Vite app di ROOT folder)   │
+   ───────────          │  main.jsx → BrowserRouter        │
+                        │  Hub.jsx   → sidebar + Routes    │
+                        │  modules.js→ registry 12 modul   │
+                        └────────┬────────────────┬────────┘
+                                 │                │
+              ┌──────────────────┴───┐     ┌──────┴───────────────┐
+              │ React.lazy (01-10)   │     │ import ?raw (00, 11) │
+              │ mount App.jsx modul  │     │ baca teks file asli  │
+              └──────────┬───────────┘     └──────────┬───────────┘
+                         │                            │
+        01-hello-component/src/App.jsx      00-es6-crash-course/*.js
+        ...                                 11-next-steps.md
+        10-final-project/src/App.jsx
+```
+
+### 3.2 Keputusan teknis kunci (dan alasannya)
+
+| Keputusan | Alasan | Kalau diubah, risikonya |
+|---|---|---|
+| **Hub ditaruh di ROOT**, bukan subfolder | Semua folder modul jadi berada di dalam Vite root sehingga bisa di-import tanpa konfigurasi `server.fs.allow` | Kalau hub dipindah ke subfolder, import `../01-.../src/App.jsx` keluar dari root → Vite dev menolak serve, perlu `server.fs.allow` + path troubleshooting |
+| Hub meng-import **`App.jsx` langsung**, bukan `main.jsx` | Menghindari 10× duplikasi `createRoot` dan CSS global rangkap | Import `main.jsx` → tiap modul mencoba `createRoot` ke `#root` yang sama, saling menimpa |
+| **`React.lazy` + `Suspense`** per modul | Code-splitting; hub enteng, modul dimuat saat diklik | Static import → 1 bundle raksasa + semua efek modul jalan sekaligus |
+| Modul 00/11 via **`?raw`** | Konten selalu sinkron dengan file asli, tanpa salinan | Hardcode string di komponen → isinya cepat basi |
+| `hub.css` **menyalin** base styles dari `styles.css` modul | Demo modul mengandalkan elemen mentah (`button`, `input`, `h1`) yang sebelumnya diberi gaya oleh `styles.css` milik modul (yang tidak dimuat hub) | Tanpa salinan ini, semua demo terlihat polos/rusak |
+| `StrictMode` dipertahankan di hub | Menjaga perilaku yang sama seperti saat modul belajar `useEffect` (dipanggil 2× di dev) | Efek modul 07/09 berperilaku berbeda dari README |
+
+### 3.3 Inventaris file hub
+
+| File | Tanggung jawab |
+|---|---|
+| `package.json` | Dep hub (react, react-dom, react-router-dom) + script dev/build/preview |
+| `vite.config.js` | Plugin React saja; root = folder ini |
+| `index.html` | Entry, `<div id="root">` → `/src/main.jsx` |
+| `src/main.jsx` | `createRoot` + `StrictMode` + `BrowserRouter` |
+| `src/Hub.jsx` | Layout sidebar (3 grup) + definisi `<Routes>` |
+| `src/modules.js` | **Satu-satunya registry modul** — sumber kebenaran untuk sidebar, rute, dan kartu overview |
+| `src/hub.css` | Base styles modul + seluruh kelas layout `hub-*` |
+| `src/pages/Overview.jsx` | Dashboard kartu semua modul |
+| `src/pages/ModulePage.jsx` | Mount demo 01-10 + header + tombol "Salin" jalur file |
+| `src/pages/Es6Page.jsx` | Tab per file `.js` modul 00 + isi mentah |
+| `src/pages/NextStepsPage.jsx` | Render isi `11-next-steps.md` |
+
+**Aturan penamaan CSS:** semua kelas hub wajib berawalan `hub-` agar tidak menabrak kelas milik modul (`.tombol`, `.keranjang`, dsb).
+
+---
+
+## 4. Dependensi & Runtime
+
+Terekam saat verifikasi (root):
+
+| Paket | Range di `package.json` | Versi terpasang |
+|---|---|---|
+| react | ^19.1.0 | 19.3.1 |
+| react-dom | ^19.1.0 | 19.3.1 |
+| react-router-dom | ^7.1.1 | 7.18.4 |
+| vite | ^6.3.5 | 6.4.5 |
+| @vitejs/plugin-react | ^4.4.1 | 4.7.0 |
+
+Runtime teruji: **Node v24.19.0 / npm 11.17.0**. README menyebut Node ≥18 — belum diverifikasi di 18/20, jadi anggap 20+ sebagai minimum yang aman.
+
+> Catatan: `@vitejs/plugin-react` **wajib** ada untuk React 19 + Vite 6 (JSX transform). Jangan dihapus saat rapikan dependensi.
+
+### Ukuran disk (penting untuk CI / clone)
+
+Tiap modul punya `node_modules` **sendiri** (±43–47 MB per modul) + root hub (± sama). Total bisa **>500 MB** dan **11 `package-lock.json`** terpisah. Ini konsekuensi sadar dari "modul mandiri", tapi memberatkan. Lihat [Hutang Teknis](#hutang-teknis--kendala-yang-diketahui) opsi A.
+
+---
+
+## 5. Cara Menambah / Mengubah Modul
+
+### 5.1 Menambah modul React baru (mis. `12-reducer`)
+
+1. **Scaffold** — salin kerangka modul yang sudah ada:
+   ```bash
+   mkdir 12-reducer && cp -r 07-useeffect/{vite.config.js,index.html} 12-reducer/
+   mkdir -p 12-reducer/src
+   ```
+   Lalu buat `12-reducer/package.json` sendiri (ubah `name`), dan isi `src/main.jsx`, `src/App.jsx`, `src/styles.css`.
+2. **`App.jsx` wajib default-export** dan hanya pakai **import relatif** ke dalam foldernya:
+   ```jsx
+   export default function App() { ... }
+   ```
+   Jangan mengembalikan JSX dari `main.jsx`; hub meng-import `App.jsx`.
+3. **Daftarkan** di `src/modules.js`:
+   ```js
+   {
+     num: "12", folder: "12-reducer", title: "useReducer",
+     desc: "Reducer untuk state kompleks.", type: "react",
+     Component: lazy(() => import("../12-reducer/src/App.jsx")),
+   },
+   ```
+   Sidebar, rute, dan kartu overview **otomatis** muncul — tidak ada file lain yang perlu diubah.
+4. **Tulis README** modul (konsep + latihan di bagian akhir).
+5. **Verifikasi**: `npm run build` di root, lalu klik modulnya di hub.
+
+### 5.2 Menambah halaman hub non-React (mis. glosarium)
+
+1. Buat `src/pages/GlosariumPage.jsx`.
+2. Tambah entri `{ num: "12", type: "md", ... }` di `modules.js`.
+3. Tambah `<Route path="/modul/XX" element={<GlosariumPage/>} />` di `Hub.jsx`.
+
+Tipe `es6`/`md` **tidak punya** `Component` — ia di-route manual di `Hub.jsx`. Kalau menambah tipe baru, perhatikan `ModulePage.jsx` yang me-*redirect* tipe non-`react`; tambahkan cabang redirect-nya di sana.
+
+### 5.3 Mengubah isi modul 00 atau 11
+
+Cukup edit file aslinya (`00-es6-crash-course/*.js` atau `11-next-steps.md`). **Hub otomatis menampilkan versi terbaru** karena memakai `?raw` — tidak perlu sinkron manual.
+
+---
+
+## 6. Status Verifikasi (yang sudah dibuktikan)
+
+Diverifikasi pada kondisi saat ini (dev server + browser headless):
+
+| Item | Metode | Hasil |
+|---|---|---|
+| Build hub | `npm run build` | ✅ 79 modul ter-transform, **0 error**, chunk `App-*.js` terpisah → lazy-loading terbukti |
+| Demo 01-10 | Browser, per rute `/modul/01…10` | ✅ Semuanya mount; heading & jumlah elemen cocok (mis. 04: 13 `<li>`, 05: 8 input, 08: 7 tombol + 2 input) |
+| Data API nyata | Rute `/modul/09` | ✅ 5 item dari `jsonplaceholder` ter-render |
+| Interaksi state | Rute `/modul/10` | ✅ Tambah tugas mengubah daftar **3 → 4** item |
+| Modul baca-saja | `/modul/00`, `/modul/11` | ✅ 10 file ES6 + tab, markdown tampil penuh |
+| Runtime cleanliness | Console | ✅ **0 error / 0 warning** |
+| Latihan ES6 | `node` per file | ✅ 8 file jalan |
+
+Perintah re-verifikasi cepat untuk pengembang berikutnya:
+
+```bash
+npm run build
+npm run dev
+# lalu cek: / , /modul/00 , /modul/10 (tambah tugas) , /modul/09 (data API) , /modul/11
+```
+
+---
+
+## 7. Hutang Teknis & Kendala yang Diketahui
+
+Ditulis jujur apa adanya — ini yang pertama kali perlu dibereskan.
+
+| # | Temuan | Dampak | Saran penanganan |
+|---|---|---|---|
+| H1 | **Belum ada repository Git.** `git status` → `fatal: not a git repository` | Tidak ada riwayat perubahan, tidak bisa collab/CI/deploy | `git init && git add -A && git commit -m "init: kursus react + hub"`. `.gitignore` sudah siap (node_modules, dist, .vite, .DS_Store) |
+| H2 | **10 folder `dist/` basi** dari build verifikasi lama (`01-hello-component/dist`, dst.) | Artefak usang, bikin bingung & boros disk | `find . -maxdepth 2 -name dist -type d -exec rm -rf {} +` |
+| H3 | **Duplikasi `node_modules` per modul** (±11 salinan, >500 MB) | Clone/install berat | *Opsi A:* jadikan **workspace monorepo** (`npm workspaces` di root) supaya 1 `node_modules`. *Catatan:* mengubah model "modul mandiri", jadi putuskan sadar |
+| H4 | **Base styles diduplikasi**: `src/hub.css` menyalin isi `styles.css` tiap modul | Ubah gaya global → harus ubah di 11 tempat | Ekstrak `styles.css` ke satu file bersama (mis. `shared/base.css`) yang di-`@import` modul & hub. Perlu sedikit refactor jalur import |
+| H5 | **Modul 00 tidak bisa dijalankan dari hub** (butuh Node) | Pembelajar harus buka terminal | Opsional: tambah panel "output" yang menjalankan skrip lewat Web Worker/`new Function`, **tapi** hati-hati: `import/export` antar-file tidak jalan tanpa bundler. Nilai edukatif model saat ini justru "ES6 murni = jalan di Node" |
+| H6 | **Markdown 11 dirender mentah** di `<pre>`, bukan HTML | Kurang nyaman dibaca, heading/code block polos | Tambah renderer ringan (`marked`/`react-markdown`) **hanya di hub** agar modul tetap bebas dependensi |
+| H7 | **Tombol "Salin" butuh secure context** (`navigator.clipboard`) | Gagal diam-diam saat diakses via HTTP non-localhost/jaringan | Sudah ada `try/catch`, tapi beri fallback `document.execCommand('copy')` atau tampilkan teks saja |
+| H8 | **Tidak ada ESLint/Prettier/testing/CI** | Regresi tak terdeteksi otomatis | Tambah ESLint (wajib: `react-hooks` agar aturan hooks ditegakkan) + Prettier + 1 workflow CI (`npm run build`). Untuk uji: Vitest + React Testing Library |
+| H9 | `docs/panduan.md` **kosong (0 byte)** | Membingungkan, tampak seperti file rusak | Isi atau hapus. `docs/plan.md` = snapshot rencana awal (dipertahankan sebagai arsip) |
+| H10 | **Tidak ada `README` untuk hub itu sendiri** di `src/` | Arsitektur hub hanya terdokumentasi di sini | Pertimbangkan `src/README.md` singkat |
+| H11 | Port dev **5173** dipakai hub; modul mandiri juga 5173 | Tidak bisa menjalankan hub + modul bersamaan tanpa berebut port | Jalankan salah satu, atau `npm run dev -- --port 5180` |
+
+---
+
+## 8. Backlog Pengembangan Lanjutan
+
+Diurutkan dari rasio nilai/tenaga tertinggi.
+
+### near — selesai dalam hitungan jam
+
+- [ ] **Bereskan H1 + H2**: `git init` + commit awal, hapus `dist/` basi. Fondasi semua pekerjaan lain.
+- [ ] **Bereskan H9**: hapus/isi `docs/panduan.md`.
+- [ ] **ESLint + Prettier (H8)**: termasuk `eslint-plugin-react-hooks` — sekaligus alat bantu belajar "aturan hooks" (Modul 08).
+- [ ] **CI sederhana**: workflow `npm ci && npm run build` di root.
+
+### mid — 1–2 hari masing-masing
+
+- [ ] **Render markdown hub (H6)** dengan `react-markdown` + syntax highlight untuk code block.
+- [ ] **Ekstrak base CSS (H4)** ke satu sumber bersama.
+- [ ] **Pencarian/filter di sidebar**: saring modul berdasarkan judul & deskripsi, plus penanda progres.
+- [ ] **Status "dipelajari" per modul** yang disimpan di localStorage (hub-level, `useState` + hook) — pengingat bagi pembelajar sudah sampai mana.
+- [ ] **Dua tema (light/dark) untuk hub** — memakai pola Context dari Modul 06, sekaligus jadi contoh nyata Context di app "sesungguhnya".
+
+### later — perlu keputusan desain
+
+- [ ] **Monorepo workspaces (H3)** — hapus duplikasi `node_modules`; putuskan apakah model "modul mandiri" tetap dipertahankan.
+- [ ] **KUIS di akhir tiap modul** di hub (soal pilihan ganda per modul), data disimpan di `modules.js`.
+- [ ] **Halaman "sandi/penjelasan istilah"** (glosarium) hasil ekstraksi dari semua README.
+- [ ] **Deploy hub** ke Vercel/Netlify sebagai situs kursus publik (build statis; modul 00/11 tetap terbaca).
+- [ ] **Versi TypeScript paralel** (mis. folder `ts/`) tanpa mengubah jalur belajar JS murni.
+
+---
+
+## 9. Konvensi Kode (wajib diikuti)
+
+- **Komponen**: fungsi + hooks. Tidak ada class component.
+- **Penamaan**: file komponen PascalCase (`TodoItem.jsx`), hook diawali `use` (`useFetch.js`, `useLocalStorage.js`), kelas CSS hub berawalan `hub-`.
+- **Impor di hub**: pakai jalur **ekstensi lengkap** (`../01-hello-component/src/App.jsx`) agar jelas dan tidak ambigu.
+- **State**: jangan pernah ubah objek/array langsung — selalu spread (ini yang diajarkan Modul 03/04; hub pun harus memberi contoh).
+- **Komentar**: bahasa Indonesia, menjelaskan *kenapa* bukan *apa*. Setiap modul React diawali blok komentar konsep.
+- **README per modul**: konsep → jalankan → ubah → latihan (format yang sudah ada).
+- **Jangan** menambah dependensi ke folder modul 01-10.
+
+---
+
+## 10. Runbook Troubleshooting
+
+| Gejala | Penyebab paling mungkin | Solusi |
+|---|---|---|
+| Layar demo modul putih/berhenti di "Memuat modul…" | Gagal memuat chunk lazy; nama folder di `modules.js` tidak cocok | Cek `folder` + jalur `Component:` di `src/modules.js`; pastikan `<folder>/src/App.jsx` ada & ada `export default` |
+| Demo tampil tapi **polos tanpa gaya** | `hub.css` tidak terimpor / kelas berubah | Pastikan `src/main.jsx` mengimpor `./hub.css`; cek kelas `button`, `input`, `h1` di `hub.css` |
+| Error `fs.allow` / file di luar root saat dev | Ada yang memindah hub ke subfolder | Kembalikan hub ke root, atau tambahkan `server.fs.allow` |
+| Sidebar tidak menampilkan modul baru | Modul belum didaftarkan di `modules.js` | Tambah entri (lihat §5.1) — restart dev server |
+| Tombol "Salin" tidak menyalin | Bukan secure context (HTTP via IP) | Akses via `localhost`, atau implementasikan fallback H7 |
+| Modul 09 tidak menampilkan data | Tidak ada jaringan ke `jsonplaceholder` | Butuh internet; atau ganti URL ke fixture lokal |
+| Port 5173 sudah dipakai | Hub + modul jalan bersamaan | `npm run dev -- --port 5180` |
+| Build lambat / memory tinggi | Semua modul ikut ter-bundle saat glob `?raw` | Normal (modul 00 kecil); kalau bertambah besar, batasi pola glob |
+
+Log dev server bisa dialihkan: `npm run dev > /tmp/hub-dev.log 2>&1 &`.
+
+---
+
+## 11. Peta Belajar (konteks untuk pengajar)
+
+Urutan kurikulum dan konsep yang ditanam — berguna kalau mau menambah modul agar tidak melompat tingkat:
+
+| Modul | Konsep inti | Titik rawan pembelajar |
+|---|---|---|
+| 00 | ES6: arrow, destructuring, spread, map/filter/reduce, async | `map` untuk render list; `const` vs `let` |
+| 01 | JSX, komponen, props, children | Aturan JSX (`className`, ekspresi `{}`) |
+| 02 | Styling: import CSS, conditional class, inline | `className` vs `class` |
+| 03 | Event, `useState`, re-render, updater fn | **Paling krusial**: kenapa state tak boleh diubah langsung |
+| 04 | `.map()` + `key` | Kenapa `key` bukan indeks |
+| 05 | Controlled component, submit | `value` tanpa `onChange` bikin input terkunci |
+| 06 | Lifting up, props drilling, Context | Arah data (satu arah ke bawah, callback ke atas) |
+| 07 | `useEffect`, dependency array, cleanup | Infinite loop; StrictMode double-invoke |
+| 08 | Custom hooks, aturan hooks, `useRef` | Hooks tak boleh di dalam `if`/loop |
+| 09 | Fetch async, loading/error/empty | AbortController & cleanup |
+| 10 | **Sintesis**: Todo App + localStorage | Merangkai banyak komponen & alur data |
+| 11 | Arah lanjutan (Router, TS, Next.js, deploy) | — |
+
+---
+
+## 12. Referensi Silang
+
+- `README.md` (root) — peta kurikulum + cara pakai untuk **pembelajar** (lebih ringkas dari dokumen ini).
+- `docs/plan.md` — snapshot rencana awal (arsip; jangan diedit sebagai sumber kebenaran).
+- `11-next-steps.md` — kurikulum lanjutan, dirender di rute `/modul/11`.
+- Tiap `<modul>/README.md` — teori per modul.
+- Laporan visual penyelesaian (canvas): `react-hub-completion-report.canvas.tsx` di direktori canvas Qoder proyek ini.
+
+---
+
+## 13. Ringkasan Satu Paragraf
+
+Proyek ini adalah kursus React 12 modul berbahasa Indonesia yang berjalan di dua mode: hub terpadu di root (Vite + React 19 + React Router 7, semua demo 01-10 dimuat via `React.lazy`, modul 00/11 dibaca via `?raw`) dan modul mandiri per folder. Semua sudah terverifikasi lewat build dan browser dengan 0 error. Yang paling menghambat pengembangan berikutnya bukan fitur, tapi fondasi rekayasa: **belum ada Git**, artefak `dist/` usang belum dibersihkan, belum ada lint/CI, dan ada duplikasi kecil (base CSS, `node_modules`). Selesaikan §8 bagian *near*, sisanya tinggal berkembang.
