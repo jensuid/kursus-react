@@ -2,7 +2,7 @@
 
 > **Untuk:** developer/pengajar yang melanjutkan proyek ini
 > **Lokasi:** folder hasil clone (`react-ui/`)
-> **Status:** Fitur lengkap & terverifikasi. **Sudah masuk version control** (branch `main`, commit awal `772d5c7`). Siap dilanjutkan.
+> **Status:** Fitur lengkap & terverifikasi. **Repo publik:** `github.com/jensuid/kursus-react` (branch `main`). Siap dilanjutkan.
 > **Baca pertama:** bagian [Mulai Cepat](#mulai-cepat) lalu [Hutang Teknis](#hutang-teknis--kendala-yang-diketahui).
 
 ---
@@ -244,7 +244,7 @@ sisanya masih terbuka.
 
 | # | Status | Temuan | Dampak | Saran penanganan |
 |---|---|---|---|---|
-| H1 | ✅ **Beres** | Dahulu: tidak ada repository Git | — | Sekarang repo aktif di branch **`main`**, commit awal `772d5c7` (121 file), `git status` bersih. `.gitignore` terbukti mengabaikan `node_modules/` & `dist/`. **Belum ada remote** — tambahkan dengan `git remote add origin <url> && git push -u origin main` |
+| H1 | ✅ **Beres** | Dahulu: tidak ada repository Git | — | Repo aktif & **sudah publik** di `github.com/jensuid/kursus-react` (branch `main`, tracking `origin/main`). `.gitignore` terbukti bekerja: remote memuat 148 entri dengan **0 `node_modules` dan 0 `dist`**. Path absolut lokal sudah digeneralisasi dari dokumen sebelum push |
 | H2 | ✅ **Beres** | Dahulu: 10 folder `dist/` basi dari build verifikasi lama | — | Sudah dihapus semuanya; 10 folder `src/` modul tetap utuh. Build berikutnya menghasilkan `dist/` baru yang memang boleh diabaikan git |
 | H3 | ⬜ Terbuka | **Duplikasi `node_modules` per modul** (±11 salinan, >500 MB) | Clone/install berat | *Opsi A:* jadikan **workspace monorepo** (`npm workspaces` di root) supaya 1 `node_modules`. *Catatan:* mengubah model "modul mandiri", jadi putuskan sadar |
 | H4 | ⬜ Terbuka | **Base styles diduplikasi**: `src/hub.css` menyalin isi `styles.css` tiap modul | Ubah gaya global → harus ubah di 11 tempat | Ekstrak `styles.css` ke satu file bersama (mis. `shared/base.css`) yang di-`@import` modul & hub. Perlu sedikit refactor jalur import |
@@ -265,7 +265,7 @@ Diurutkan dari rasio nilai/tenaga tertinggi.
 ### near — selesai dalam hitungan jam
 
 - [x] ~~**Bereskan H1 + H2**~~ — **selesai**: repo Git di branch `main`, commit awal `772d5c7`, 10 folder `dist/` basi dihapus.
-- [ ] **Tambah remote + push** (`git remote add origin <url> && git push -u origin main`) — prasyarat CI & deploy.
+- [x] ~~**Tambah remote + push**~~ — **selesai**: `origin` = `https://github.com/jensuid/kursus-react` (public), `main` tracking `origin/main`.
 - [ ] **Bereskan H9**: hapus/isi `docs/panduan.md`.
 - [x] ~~**ESLint + Prettier (H8)**~~ — **selesai**: lihat §3.4 untuk cara pakai & keputusan cakupannya.
 - [ ] **CI sederhana**: workflow `npm ci && npm run lint && npm run build` di root.
