@@ -13,8 +13,9 @@ Setiap modul berisi **README penjelasan konsep (bahasa Indonesia)** + **kode yan
   hanya `npm run lint` (ESLint 10 butuh `util.styleText` yang baru ada di
   Node ≥20.12). Jadi: sebagai pembelajar kamu aman di 18; sebagai pengembang/
   penjaga proyek, pakai 20 ke atas — dan **22 ke atas kalau mau menjalankan
-  `npm run test`** (vitest 5 menulis `engines` `^22.12.0 || ^24.0.0 || >=26.0.0`,
-  jsdom 30 `^22.22.2 || ^24.15.0 || >=26.0.0`).
+  `npm run test`** (terukur lewat CI: di Node **20.20.2** langkah uji gagal,
+  di Node **22.23.3** 53 uji lulus — sesuai `engines` vitest 5
+  `^22.12.0 || ^24.0.0 || >=26.0.0` dan jsdom 30 `^22.22.2 || ^24.15.0 || >=26.0.0`).
   CI dijaga di `.github/workflows/ci.yml`.
 - Editor kode (VS Code / Qoder / lainnya)
 - Pengetahuan HTML & CSS dasar
