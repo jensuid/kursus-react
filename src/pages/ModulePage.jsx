@@ -44,7 +44,8 @@ export default function ModulePage() {
     <div className="hub-content">
       <div className="hub-page-head">
         <div className="hub-eyebrow">
-          Modul {modul.num} · <span className={`hub-badge ${modul.type}`}>React</span>
+          Modul {modul.num} ·{" "}
+          <span className={`hub-badge ${modul.type}`}>React</span>
         </div>
         <h1 className="hub-title">{modul.title}</h1>
         <p className="hub-desc">{modul.desc}</p>

@@ -106,6 +106,50 @@ Hentikan dev server: `Ctrl + C`.
 
 ---
 
+### 3.4 Tooling kualitas kode (ESLint + Prettier)
+
+Dipasang **hanya di root** — folder modul 01-10 tetap bebas dependensi (prinsip no.3 di §1).
+
+| Perintah | Fungsi |
+|---|---|
+| `npm run lint` | ESLint seluruh repo (exit 0 = bersih) |
+| `npm run lint:fix` | Perbaikan otomatis |
+| `npm run format` | Prettier write |
+| `npm run format:check` | Cek gaya tanpa mengubah |
+
+Versi terpasang: ESLint **10.13.0**, `@eslint/js` 10.0.1, `eslint-plugin-react-hooks` **7.1.1**, `eslint-plugin-react-refresh` 0.5.7, Prettier **3.9.10**, `eslint-config-prettier` 10.1.8, `globals` 17.13.0. Config memakai **flat config** (`eslint.config.js`), bukan `.eslintrc`.
+
+**Status lint saat ini: 0 error, 11 warning.** Semuanya `no-unused-vars` di modul 00 dan memang sah (fixture LATIHAN seperti `anggota`/`data`, dan perbandingan sintaks side-by-side). Jangan "membersihkan" warning ini dengan menghapus variabelnya — itu merusak pelajaran.
+
+#### Keputusan penting: Prettier TIDAK menyentuh materi kursus
+
+`.prettierignore` mengecualikan `00-es6-crash-course/`, semua folder modul `01-*/`–`10-*/`, `docs/`, dan file markdown. Prettier **hanya** memformat infrastruktur hub (`src/**`, `*.config.js`).
+
+Alasannya, dan ini bukan pilihan estetika: banyak file kursus memakai **penyelarasan manual yang merupakan bagian dari materi**. Bukti nyata di `00-es6-crash-course/01-let-const-arrow.js`:
+
+```js
+function biasa(x) { return x * 2; }   // fungsi klasik
+const expr = function (x) { return x * 2; };  // function expression
+const arrow = (x) => { return x * 2; };       // arrow function
+const arrowPendek = (x) => x * 2;             // implicit return!
+```
+
+Kalau diformat Prettier, tiap baris dipecah jadi 3-4 baris dan komentar penjelasnya **terlepas dari barisnya** — tabel perbandingan yang menjadi inti pelajaran rusak. Karena itu jangan memperlebar cakupan Prettier ke folder modul tanpa alasan yang sangat kuat.
+
+#### Aturan yang sengaja dilonggarkan (dan kenapa)
+
+Di blok `00-es6-crash-course/**` pada `eslint.config.js`:
+
+| Aturan | Setelan | Alasan |
+|---|---|---|
+| `no-console` | `off` | File ini memang alat bantu cetak/log |
+| `no-unused-vars` | `warn` (bukan `error`) | Fixture latihan & perbandingan sintaks sengaja tak dipakai |
+| `no-constant-binary-expression` | `off` | Menghukum justru hal yang diajarkan: `0 \|\| 100` dan `null ?? "x"` untuk menunjukkan beda `\|\|` vs `??` |
+
+Kode React (hub + modul) memakai preset `react-hooks.configs.recommended` — yaitu `rules-of-hooks` (error) dan `exhaustive-deps` (warn). **Sengaja tidak** memakai `recommended-latest` yang tersedia di react-hooks 7: preset itu membawa aturan era React Compiler (`purity`, `immutability`, `set-state-in-effect`, `static-components`, `use-memo`) yang akan menyalahi pola ajar yang disengaja dan menenggelamkan pemula dalam pesan yang belum relevan bagi mereka.
+
+---
+
 ## 4. Dependensi & Runtime
 
 Terekam saat verifikasi (root):
@@ -207,7 +251,7 @@ sisanya masih terbuka.
 | H5 | ⬜ Terbuka | **Modul 00 tidak bisa dijalankan dari hub** (butuh Node) | Pembelajar harus buka terminal | Opsional: tambah panel "output" yang menjalankan skrip lewat Web Worker/`new Function`, **tapi** hati-hati: `import/export` antar-file tidak jalan tanpa bundler. Nilai edukatif model saat ini justru "ES6 murni = jalan di Node" |
 | H6 | ⬜ Terbuka | **Markdown 11 dirender mentah** di `<pre>`, bukan HTML | Kurang nyaman dibaca, heading/code block polos | Tambah renderer ringan (`marked`/`react-markdown`) **hanya di hub** agar modul tetap bebas dependensi |
 | H7 | ⬜ Terbuka | **Tombol "Salin" butuh secure context** (`navigator.clipboard`) | Gagal diam-diam saat diakses via HTTP non-localhost/jaringan | Sudah ada `try/catch`, tapi beri fallback `document.execCommand('copy')` atau tampilkan teks saja |
-| H8 | ⬜ Terbuka | **Tidak ada ESLint/Prettier/testing/CI** | Regresi tak terdeteksi otomatis | Tambah ESLint (wajib: `react-hooks` agar aturan hooks ditegakkan) + Prettier + 1 workflow CI (`npm run build`). Untuk uji: Vitest + React Testing Library |
+| H8 | 🟡 **Sebagian beres** | Dahulu: tidak ada ESLint/Prettier sama sekali | Regresi tak terdeteksi | **Sudah ada**: ESLint 10 flat config (`eslint.config.js`) + Prettier 3 (lihat §3.4). Sisa: **automated testing** (Vitest + React Testing Library) dan **CI** (workflow `npm ci && npm run lint && npm run build`) |
 | H9 | ⬜ Terbuka | `docs/panduan.md` **kosong (0 byte)** | Membingungkan, tampak seperti file rusak | Isi atau hapus. `docs/plan.md` = snapshot rencana awal (dipertahankan sebagai arsip) |
 | H10 | ⬜ Terbuka | **Tidak ada `README` untuk hub itu sendiri** di `src/` | Arsitektur hub hanya terdokumentasi di sini | Pertimbangkan `src/README.md` singkat |
 | H11 | ⬜ Terbuka | Port dev **5173** dipakai hub; modul mandiri juga 5173 | Tidak bisa menjalankan hub + modul bersamaan tanpa berebut port | Jalankan salah satu, atau `npm run dev -- --port 5180` |
@@ -223,8 +267,9 @@ Diurutkan dari rasio nilai/tenaga tertinggi.
 - [x] ~~**Bereskan H1 + H2**~~ — **selesai**: repo Git di branch `main`, commit awal `772d5c7`, 10 folder `dist/` basi dihapus.
 - [ ] **Tambah remote + push** (`git remote add origin <url> && git push -u origin main`) — prasyarat CI & deploy.
 - [ ] **Bereskan H9**: hapus/isi `docs/panduan.md`.
-- [ ] **ESLint + Prettier (H8)**: termasuk `eslint-plugin-react-hooks` — sekaligus alat bantu belajar "aturan hooks" (Modul 08).
-- [ ] **CI sederhana**: workflow `npm ci && npm run build` di root.
+- [x] ~~**ESLint + Prettier (H8)**~~ — **selesai**: lihat §3.4 untuk cara pakai & keputusan cakupannya.
+- [ ] **CI sederhana**: workflow `npm ci && npm run lint && npm run build` di root.
+- [ ] **Automated testing**: Vitest + React Testing Library (minimal uji modul 10: tambah/toggle/hapus todo).
 
 ### mid — 1–2 hari masing-masing
 
@@ -253,6 +298,8 @@ Diurutkan dari rasio nilai/tenaga tertinggi.
 - **Komentar**: bahasa Indonesia, menjelaskan *kenapa* bukan *apa*. Setiap modul React diawali blok komentar konsep.
 - **README per modul**: konsep → jalankan → ubah → latihan (format yang sudah ada).
 - **Jangan** menambah dependensi ke folder modul 01-10.
+- **Jangan** menjalankan Prettier pada materi kursus (modul 00-10 & `docs/`). Sebelum `npm run format`, pastikan entri pengecualian di `.prettierignore` masih ada — lihat §3.4.
+- Sebelum push: `npm run lint` harus exit 0. Warning `no-unused-vars` di modul 00 adalah normal dan jangan dihapus dengan menghilangkan variabel pelajarannya.
 
 ---
 

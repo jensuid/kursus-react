@@ -34,7 +34,9 @@ export default function Es6Page() {
         <div className="hub-meta">
           <span>Jalankan di terminal:</span>
           <code className="hub-path">cd 00-es6-crash-course</code>
-          <code className="hub-path">node {file?.name ?? "01-let-const-arrow.js"}</code>
+          <code className="hub-path">
+            node {file?.name ?? "01-let-const-arrow.js"}
+          </code>
         </div>
       </div>
 
@@ -57,8 +59,8 @@ export default function Es6Page() {
 
       <p className="hub-note">
         Tip: kerjakan urut dari <b>01</b> sampai <b>08</b>. Buka file yang sama
-        di editor untuk membaca komentar dan mengerjakan bagian LATIHAN di
-        bawah tiap file.
+        di editor untuk membaca komentar dan mengerjakan bagian LATIHAN di bawah
+        tiap file.
       </p>
     </div>
   );

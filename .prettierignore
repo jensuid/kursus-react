@@ -1,0 +1,36 @@
+# =====================================================================
+# Prettier HANYA memformat kode infrastruktur hub, BUKAN materi kursus.
+#
+# Alasan: banyak file modul & modul 00 memakai penyelarasan manual yang
+# menjadi bagian dari pelajaran. Contoh di 00-es6-crash-course/01:
+#
+#   function biasa(x) { return x * 2; }   // fungsi klasik
+#   const arrow    = (x) => x * 2;        // implicit return!
+#
+# Prettier akan memecahnya jadi banyak baris dan melepaskan komentar
+# penjelas dari barisnya — tabel perbandingan yang jadi inti pelajaran
+# hilang. Jadi biarkan kode ajaran apa adanya; ESLint tetap memakainya.
+# =====================================================================
+
+# Dependensi & artefak build
+node_modules/
+dist/
+.vite/
+
+# Semua modul pembelajaran (00-10) dan panduannya
+00-es6-crash-course/
+01-*/
+02-*/
+03-*/
+04-*/
+05-*/
+06-*/
+07-*/
+08-*/
+09-*/
+10-*/
+11-next-steps.md
+
+# Dokumentasi (tabel & diagram ASCII jangan diganggu formatter)
+docs/
+README.md

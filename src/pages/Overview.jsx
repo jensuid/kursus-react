@@ -21,10 +21,11 @@ export default function Overview() {
       </div>
 
       <div className="hub-banner">
-        <strong>Cara pakai:</strong> kerjakan urut dari <b>00</b> sampai <b>10</b>.
-        Untuk tiap modul React, baca komentar di samping hasilnya, lalu coba
-        ubah kodenya. Modul 00 (ES6) dijalankan di terminal, bukan di browser —
-        buka halamannya untuk melihat perintah <span className="hub-kbd">node</span>.
+        <strong>Cara pakai:</strong> kerjakan urut dari <b>00</b> sampai{" "}
+        <b>10</b>. Untuk tiap modul React, baca komentar di samping hasilnya,
+        lalu coba ubah kodenya. Modul 00 (ES6) dijalankan di terminal, bukan di
+        browser — buka halamannya untuk melihat perintah{" "}
+        <span className="hub-kbd">node</span>.
       </div>
 
       <div className="hub-grid">
@@ -32,7 +33,9 @@ export default function Overview() {
           <Link key={m.num} to={`/modul/${m.num}`} className="hub-card">
             <div className="hub-card-top">
               <span className="hub-card-num">Modul {m.num}</span>
-              <span className={`hub-badge ${m.type}`}>{badgeLabel[m.type]}</span>
+              <span className={`hub-badge ${m.type}`}>
+                {badgeLabel[m.type]}
+              </span>
             </div>
             <h3 className="hub-card-title">{m.title}</h3>
             <p className="hub-card-desc">{m.desc}</p>

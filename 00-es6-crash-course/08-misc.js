@@ -39,6 +39,15 @@ console.log("\n2. Short-circuit &&");
 console.log("   true && 'ya':", true && "ya");
 console.log("   false && 'ya':", false && "ya");
 
+// Gabungkan keduanya: ternary menghasilkan nilai, && memutuskan tampil/tidak.
+console.log("   adaError     ->", pesanError && `Tampil: ${pesanError}`);
+const adaError2 = false;
+const pesanKosong = adaError2 ? "Password salah!" : null;
+console.log(
+  "   !adaError    ->",
+  pesanKosong && `Tampil: ${pesanKosong}` // null -> tidak render apa pun
+);
+
 // Di React: {isProcessing && <Spinner />}
 // HATI-HATI jebakan klasik: {count && <List />} akan merender "0"
 // kalau count = 0! Gunakan {count > 0 && <List />}.
